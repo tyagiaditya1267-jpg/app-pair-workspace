@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "lastModified": "2026-08-31T16:19:55.898Z",
+  "collections": {
+    "snippets": [],
+    "tasks": [],
+    "notes": [
+      {
+        "id": "default",
+        "title": "Welcome Note",
+        "body": "Start typing your notes here...",
+        "updatedAt": "2026-08-31T16:02:01.031Z"
+      }
+    ],
+    "colors": [
+      "#8b5cf6",
+      "#06b6d4",
+      "#ec4899",
+      "#10b981",
+      "#f59e0b",
+      "#3b82f6"
+    ],
+    "sketches": [],
+    "apps": [],
+    "sites": [],
+    "categories": [
+      "Productivity",
+      "Media",
+      "Development",
+      "Social",
+      "Utilities",
+      "Other"
+    ],
+    "scrapeHistory": [],
+    "settings": {
+      "serverPort": 4173,
+      "theme": "dark",
+      "autoSync": true
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "app-pair-workspace",
+  "version": "2.0.0",
+  "description": "A desktop workspace to pair apps with a central Common Palette — with backend data services.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "build": {
+    "appId": "com.apppair.workspace",
+    "productName": "App-Pair Workspace",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "index.html",
+      "main.js",
+      "server.js",
+      "backend/**/*",
+      "renderer.js",
+      "style.css",
+      "preload.js",
+      "preload-webview.js",
+      "store.js",
+      "app-registry.js",
+      "data-service.js",
+      "copy-icon.js",
+      "ai-agent.js",
+      "icon.png",
+      "data/**/*",
+      "vendor/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^26.15.3",
+    "vite": "^5.4.1"
+  }
+}

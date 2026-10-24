@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App-Pair Workspace</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="icon.png">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="editorial-espresso-theme">
+
+  <!-- TOP APP TITLEBAR (Frameless Window Chrome) -->
+  <header class="app-titlebar">
+    <div class="titlebar-drag-region">
+      <div class="brand-badge">
+        <div class="brand-square"><i data-lucide="layers"></i></div>
+        <span class="brand-title">App-Pair <span class="brand-sub">Workspace</span></span>
+      </div>
+
+      <!-- Quick Navigation Header Controls -->
+      <nav class="top-nav-bar">
+        <button id="nav-launcher-btn" class="nav-tab-btn active" title="Return to Workspace Hub">
+          <i data-lucide="layout-grid"></i>
+          <span>Workspace Launcher</span>
+        </button>
+
+        <div class="top-command-wrapper" id="top-command-bar">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" id="top-search-input" placeholder="Search apps, open files, or type a command... (Ctrl+K)" autocomplete="off">
+          <kbd class="shortcut-pill">Ctrl+K</kbd>
+        </div>
+
+        <button id="nav-split-btn" class="nav-tab-btn" title="Open Split Studio">
+          <i data-lucide="columns"></i>
+          <span>Split View</span>
+        </button>
+
+        <button id="nav-palette-btn" class="nav-tab-btn" title="Toggle Common Palette Drawer">
+          <i data-lucide="swatch-book"></i>
+          <span>Palette</span>
+        </button>
+
+        <button id="nav-assistant-btn" class="nav-tab-btn" title="Toggle AI Assistant Drawer">
+          <i data-lucide="bot"></i>
+          <span>Assistant</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Native Frameless Window Controls -->
+    <div class="window-controls">
+      <button id="win-min-btn" class="win-btn" title="Minimize"><i data-lucide="minus"></i></button>
+      <button id="win-max-btn" class="win-btn" title="Maximize"><i data-lucide="square"></i></button>
+      <button id="win-close-btn" class="win-btn close" title="Close"><i data-lucide="x"></i></button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="app-body">
+    
+    <!-- LEFT MECHANICAL SIDEBAR -->
+    <aside class="studio-sidebar" id="main-sidebar">
+      <div class="sidebar-top">
+        <button class="side-btn active" id="side-hub-btn" title="Workspace Hub">
+          <i data-lucide="home"></i>
+          <span class="side-tooltip">Workspace Hub</span>
+        </button>
+        <button class="side-btn" id="side-google-btn" title="Google Search & Browser">
+          <i data-lucide="globe"></i>
+          <span class="side-tooltip">Google Search</span>
+        </button>
+        <button class="side-btn" id="side-spotify-btn" title="Spotify Web Player">
+          <i data-lucide="music"></i>
+          <span class="side-tooltip">Spotify Music</span>
+        </button>
+        <button class="side-btn" id="side-github-btn" title="GitHub Code">
+          <i data-lucide="github"></i>
+          <span class="side-tooltip">GitHub</span>
+        </button>
+        <button class="side-btn" id="side-notion-btn" title="Notion Workspace">
+          <i data-lucide="file-text"></i>
+          <span class="side-tooltip">Notion Workspace</span>
+        </button>
+        <button class="side-btn" id="side-chatgpt-btn" title="ChatGPT Assistant">
+          <i data-lucide="message-square"></i>
+          <span class="side-tooltip">ChatGPT</span>
+        </button>
+        <button class="side-btn" id="side-pdf-btn" title="Local PDF Reader">
+          <i data-lucide="file-check"></i>
+          <span class="side-tooltip">Local PDF Reader</span>
+        </button>
+      </div>
+
+      <div class="sidebar-separator"></div>
+
+      <div class="sidebar-tools">
+        <button class="side-btn" id="side-notes-btn" title="Idea Notebook">
+          <i data-lucide="book-open"></i>
+          <span class="side-tooltip">Idea Notes</span>
+        </button>
+        <button class="side-btn" id="side-tasks-btn" title="Kanban Tasks">
+          <i data-lucide="check-square"></i>
+          <span class="side-tooltip">Task Board</span>
+        </button>
+        <button class="side-btn" id="side-palette-toggle-btn" title="Common Palette">
+          <i data-lucide="palette"></i>
+          <span class="side-tooltip">Common Palette</span>
+        </button>
+        <button class="side-btn" id="side-assistant-toggle-btn" title="AI Agent Assistant">
+          <i data-lucide="cpu"></i>
+          <span class="side-tooltip">AI Assistant</span>
+        </button>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="sidebar-custom-apps" id="sidebar-custom-apps"></div>
+        <button class="side-btn" id="side-add-site-btn" title="Add Installed Laptop App or Web Site">
+          <i data-lucide="plus"></i>
+          <span class="side-tooltip">Add App / Site</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN VIEWPORT CONTAINER -->
+    <main class="main-viewport" id="main-viewport">
+
+      <!-- ======================================================== -->
+      <!-- VIEW 1: WORKSPACE HUB (LAUNCHER)                         -->
+      <!-- ======================================================== -->
+      <section class="hub-view" id="hub-view">
+        <div class="hub-container">
+          
+          <!-- Hub Header & Welcome -->
+          <div class="hub-header">
+            <div class="hub-title-row">
+              <h1 class="hub-heading">Workspace Hub</h1>
+              <span class="hub-version-tag">STATION v2.4</span>
+            </div>
+            <p class="hub-subheading">Open apps in full view or launch a paired split workspace.</p>
+          </div>
+
+          <!-- URL & App Search Box -->
+          <div class="hub-search-section">
+            <div class="search-input-box">
+              <i data-lucide="search" class="hub-search-icon"></i>
+              <input type="text" id="hub-search-input" placeholder="Search apps, tools, or type any URL..." autocomplete="off">
+              <button id="hub-clear-search-btn" class="clear-input-btn hidden" title="Clear Search"><i data-lucide="x"></i></button>
+              <button id="hub-go-btn" class="action-go-btn" title="Launch URL or Search">Go <i data-lucide="corner-down-left"></i></button>
+            </div>
+            <div class="search-hints">
+              <span>Quick jump:</span>
+              <button class="hint-chip" data-url="https://www.google.com">Google</button>
+              <button class="hint-chip" data-url="https://open.spotify.com">Spotify</button>
+              <button class="hint-chip" data-url="https://github.com">GitHub</button>
+              <button class="hint-chip" data-url="https://chatgpt.com">ChatGPT</button>
+              <button class="hint-chip" data-url="https://www.notion.so">Notion</button>
+            </div>
+          </div>
+
+          <!-- CUSTOM APP-PAIR HARDWARE BUILDER -->
+          <div class="custom-pair-builder-card">
+            <div class="builder-header">
+              <div class="title-with-count">
+                <i data-lucide="shuffle"></i>
+                <h3>Custom App-Pair Builder</h3>
+                <span class="section-badge">INTERACTIVE DOCK</span>
+              </div>
+              <span class="section-meta">Pair any local laptop app (.exe), web service, or workspace tool</span>
+            </div>
+            <div class="builder-controls-row">
+              <div class="builder-slot">
+                <span class="slot-label">LEFT PANE APP</span>
+                <select id="builder-left-select" class="builder-select">
+                  <option value="google">Google Search & Browser</option>
+                  <option value="spotify">Spotify Web Player</option>
+                  <option value="github">GitHub Repositories</option>
+                  <option value="chatgpt">ChatGPT Assistant</option>
+                  <option value="notion">Notion Workspace</option>
+                  <option value="pdf">Local PDF Reader</option>
+                  <option value="notes">Idea Notes</option>
+                  <option value="tasks">Task Board</option>
+                </select>
+              </div>
+
+              <div class="builder-link-badge">
+                <i data-lucide="link-2"></i>
+                <span>SPLIT LINK</span>
+              </div>
+
+              <div class="builder-slot">
+                <span class="slot-label">RIGHT PANE APP</span>
+                <select id="builder-right-select" class="builder-select">
+                  <option value="notes" selected>Idea Notes</option>
+                  <option value="google">Google Search & Browser</option>
+                  <option value="spotify">Spotify Web Player</option>
+                  <option value="github">GitHub Repositories</option>
+                  <option value="chatgpt">ChatGPT Assistant</option>
+                  <option value="notion">Notion Workspace</option>
+                  <option value="pdf">Local PDF Reader</option>
+                  <option value="tasks">Task Board</option>
+                </select>
+              </div>
+
+              <div class="builder-slot" style="max-width: 140px;">
+                <span class="slot-label">SPLIT RATIO</span>
+                <div class="builder-ratio-pills">
+                  <button class="b-ratio-btn" data-ratio="30">30/70</button>
+                  <button class="b-ratio-btn active" data-ratio="50">50/50</button>
+                  <button class="b-ratio-btn" data-ratio="70">70/30</button>
+                </div>
+              </div>
+
+              <button id="builder-launch-btn" class="tactile-btn primary" style="height: 38px;">
+                <i data-lucide="play"></i>
+                <span>Launch Pair</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SECTION 1: PAIRED WORKSPACES (SPLIT VIEW PRESETS) -->
+          <div class="hub-section">
+            <div class="section-title-bar">
+              <div class="title-with-count">
+                <i data-lucide="columns"></i>
+                <h2>Paired Workspaces (Split View Presets)</h2>
+                <span class="section-badge">6 PRESETS</span>
+              </div>
+              <span class="section-meta">Click "Launch Pair" to open side-by-side</span>
+            </div>
+
+            <div class="pair-cards-grid" id="pairs-grid">
+
+              <!-- PAIR 1: Research & Synthesis -->
+              <div class="workspace-card" data-pair-id="pair-research" data-app-left="google" data-app-right="notes">
+                <div class="card-top">
+                  <span class="category-tag">RESEARCH</span>
+                  <div class="card-icon-pair">
+                    <span class="app-chip"><i data-lucide="globe"></i> Google</span>
+                    <span class="pair-plus">+</span>
+                    <span class="app-chip"><i data-lucide="book-open"></i> Notes</span>
+                  </div>
+                </div>
+                <div class="card-main">
+                  <h3 class="card-title">Research & Synthesis</h3>
+                  <p class="card-desc">Live Google Web Browser on the left, full Markdown Idea Notes editor on the right for continuous synthesis.</p>
+                </div>
+                <div class="card-footer">
+                  <button class="launch-pair-btn" data-pair="pair-research">
+                    <span>Launch Pair</span>
+                    <i data-lucide="arrow-up-right"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- PAIR 2: AI Coding Assistant -->
+              <div class="workspace-card" data-pair-id="pair-coding" data-app-left="github" data-app-right="chatgpt">
+                <div class="card-top">
+                  <span class="category-tag">CODING</span>
+                  <div class="card-icon-pair">
+                    <span class="app-chip"><i data-lucide="github"></i> GitHub</span>
+                    <span class="pair-plus">+</span>
+                    <span class="app-chip"><i data-lucide="message-square"></i> ChatGPT</span>
+                  </div>
+                </div>
+                <div class="card-main">
+                  <h3 class="card-title">AI Coding Assistant</h3>
+                  <p class="card-desc">Explore repositories, PRs, and docs on GitHub alongside real ChatGPT for live code generation and debugging.</p>
+                </div>
+                <div class="card-footer">
+                  <button class="launch-pair-btn" data-pair="pair-coding">
+                    <span>Launch Pair</span>
+                    <i data-lucide="arrow-up-right"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- PAIR 3: Focus Flow -->
+              <div class="workspace-card" data-pair-id="pair-focus" data-app-left="notion" data-app-right="spotify">
+                <div class="card-top">
+                  <span class="category-tag">FOCUS</span>
+                  <div class="card-icon-pair">
+                    <span class="app-chip"><i data-lucide="file-text"></i> Notion</span>
+                    <span class="pair-plus">+</span>
+                    <span class="app-chip"><i data-lucide="music"></i> Spotify</span>
+                  </div>
+                </div>
+                <div class="card-main">
+                  <h3 class="card-title">Focus Flow</h3>
+                  <p class="card-desc">Deep focus mode combining your real Notion workspace docs with embedded Spotify music and playlists.</p>
+                </div>
+                <div class="card-footer">
+                  <button class="launch-pair-btn" data-pair="pair-focus">
+                    <span>Launch Pair</span>
+                    <i data-lucide="arrow-up-right"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- PAIR 4: Productivity Duo -->
+              <div class="workspace-card" data-pair-id="pair-productivity" data-app-left="tasks" data-app-right="notes">
+                <div class="card-top">
+                  <span class="category-tag">PRODUCTIVITY</span>
+                  <div class="card-icon-pair">
+                    <span class="app-chip"><i data-lucide="check-square"></i> Tasks</span>
+                    <span class="pair-plus">+</span>
+                    <span class="app-chip"><i data-lucide="book-open"></i> Notes</span>
+                  </div>
+                </div>
+                <div class="card-main">
+                  <h3 class="card-title">Productivity Duo</h3>
+                  <p class="card-desc">Interactive Kanban sprint board paired with your markdown idea notebook for tracking sprints and specs.</p>
+                </div>
+                <div class="card-footer">
+                  <button class="launch-pair-btn" data-pair="pair-productivity">
+                    <span>Launch Pair</span>
+                    <i data-lucide="arrow-up-right"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- PAIR 5: Dual PDF Compare -->
+              <div class="workspace-card" data-pair-id="pair-dual-pdf" data-app-left="pdf1" data-app-right="pdf2">
+                <div class="card-top">
+                  <span class="category-tag">DOCUMENTS</span>
+                  <div class="card-icon-pair">
+                    <span class="app-chip"><i data-lucide="file-check"></i> PDF 1</span>
+                    <span class="pair-plus">+</span>
+                    <span class="app-chip"><i data-lucide="file-check"></i> PDF 2</span>
+                  </div>
+                </div>
+                <div class="card-main">
+                  <h3 class="card-title">Dual PDF Compare</h3>
+                  <p class="card-desc">Side-by-side local PDF file reader to compare contracts, academic drafts, and revisions from your laptop.</p>
+                </div>
+                <div class="card-footer">
+                  <button class="launch-pair-btn" data-pair="pair-dual-pdf">
+                    <span>Launch Pair</span>
+                    <i data-lucide="arrow-up-right"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- PAIR 6: PDF & Idea Notes -->
+              <div class="workspace-card" data-pair-id="pair-pdf-notes" data-app-left="pdf1" data-app-right="notes">
+                <div class="card-top">
+                  <span class="category-tag">STUDY</span>
+                  <div class="card-icon-pair">
+                    <span class="app-chip"><i data-lucide="file-check"></i> PDF</span>
+                    <span class="pair-plus">+</span>
+                    <span class="app-chip"><i data-lucide="book-open"></i> Notes</span>
+                  </div>
+                </div>
+                <div class="card-main">
+                  <h3 class="card-title">PDF & Idea Notes</h3>
+                  <p class="card-desc">Read local laptop PDF documents with immediate note-taking, markdown citations, and summaries in Idea Notes.</p>
+                </div>
+                <div class="card-footer">
+                  <button class="launch-pair-btn" data-pair="pair-pdf-notes">
+                    <span>Launch Pair</span>
+                    <i data-lucide="arrow-up-right"></i>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- SECTION 2: OFFLINE LOCAL FILES & PDF SHELF -->
+          <div class="hub-section">
+            <div class="section-title-bar">
+              <div class="title-with-count">
+                <i data-lucide="folder-open"></i>
+                <h2>Offline Files & PDF Shelf</h2>
+                <span class="section-badge">LOCAL STORAGE</span>
+              </div>
+              <span class="section-meta">Select and read PDF files stored on your laptop</span>
+            </div>
+
+            <div class="pdf-shelf-card">
+              <div class="pdf-shelf-content">
+                <div class="shelf-icon-block">
+                  <i data-lucide="file-text"></i>
+                </div>
+                <div class="shelf-info">
+                  <h3>Open Local PDF Documents</h3>
+                  <p>Choose any PDF from your laptop to read inside App-Pair Workspace. Open in a standalone tab or launch side-by-side with another PDF or Idea Notes.</p>
+                  <div class="shelf-actions">
+                    <button id="hub-browse-pdf-btn" class="tactile-btn primary">
+                      <i data-lucide="folder"></i>
+                      <span>Browse Laptop for PDF...</span>
+                    </button>
+                    <button id="hub-open-sample-pdf-btn" class="tactile-btn secondary">
+                      <i data-lucide="file-check"></i>
+                      <span>Open Sample Contract PDF</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recent Files Row -->
+              <div class="recent-files-row" id="recent-pdf-shelf">
+                <span class="recent-label">Recent offline files:</span>
+                <div class="recent-chips" id="recent-chips-container">
+                  <span class="chip-empty">No recent files yet. Click Browse to open a PDF.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3: SINGLE APPS & TOOLS -->
+          <div class="hub-section">
+            <div class="section-title-bar">
+              <div class="title-with-count">
+                <i data-lucide="grid"></i>
+                <h2>Single Applications & Tools</h2>
+                <span class="section-badge">FULL VIEW</span>
+              </div>
+              <span class="section-meta">Click to launch any tool in full window view</span>
+            </div>
+
+            <div class="single-apps-grid" id="single-apps-grid">
+
+              <!-- Google -->
+              <div class="single-app-card" data-launch="google" data-url="https://www.google.com">
+                <div class="single-app-icon"><i data-lucide="globe"></i></div>
+                <div class="single-app-meta">
+                  <h4>Google Search</h4>
+                  <span>Web Browser</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- Spotify -->
+              <div class="single-app-card" data-launch="spotify" data-url="https://open.spotify.com">
+                <div class="single-app-icon"><i data-lucide="music"></i></div>
+                <div class="single-app-meta">
+                  <h4>Spotify</h4>
+                  <span>Web Music Player</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- GitHub -->
+              <div class="single-app-card" data-launch="github" data-url="https://github.com">
+                <div class="single-app-icon"><i data-lucide="github"></i></div>
+                <div class="single-app-meta">
+                  <h4>GitHub</h4>
+                  <span>Repositories & Code</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- ChatGPT -->
+              <div class="single-app-card" data-launch="chatgpt" data-url="https://chatgpt.com">
+                <div class="single-app-icon"><i data-lucide="message-square"></i></div>
+                <div class="single-app-meta">
+                  <h4>ChatGPT</h4>
+                  <span>OpenAI Assistant</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- Notion -->
+              <div class="single-app-card" data-launch="notion" data-url="https://www.notion.so">
+                <div class="single-app-icon"><i data-lucide="file-text"></i></div>
+                <div class="single-app-meta">
+                  <h4>Notion</h4>
+                  <span>Workspace & Docs</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- PDF Reader -->
+              <div class="single-app-card" data-launch="pdf">
+                <div class="single-app-icon"><i data-lucide="file-check"></i></div>
+                <div class="single-app-meta">
+                  <h4>PDF Reader</h4>
+                  <span>Offline Laptop Docs</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- Idea Notebook -->
+              <div class="single-app-card" data-launch="notes">
+                <div class="single-app-icon"><i data-lucide="book-open"></i></div>
+                <div class="single-app-meta">
+                  <h4>Idea Notebook</h4>
+                  <span>Markdown Workspace</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- Task Board -->
+              <div class="single-app-card" data-launch="tasks">
+                <div class="single-app-icon"><i data-lucide="check-square"></i></div>
+                <div class="single-app-meta">
+                  <h4>Task Board</h4>
+                  <span>Kanban Sprints</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- Common Palette -->
+              <div class="single-app-card" data-launch="palette">
+                <div class="single-app-icon"><i data-lucide="swatch-book"></i></div>
+                <div class="single-app-meta">
+                  <h4>Common Palette</h4>
+                  <span>Clipboard & Sketches</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- VIEW 2: SPLIT STUDIO (SIDE-BY-SIDE REAL APPS)            -->
+      <!-- ======================================================== -->
+      <section class="split-view hidden" id="split-view">
+        
+        <!-- Central Unobtrusive Control Strip -->
+        <div class="split-toolbar">
+          <div class="split-toolbar-left">
+            <button id="split-back-hub-btn" class="split-tool-btn" title="Return to Workspace Hub">
+              <i data-lucide="layout-grid"></i>
+              <span>Workspace Launcher</span>
+            </button>
+            <span class="active-pair-label" id="current-pair-title">Active Workspace Pair</span>
+          </div>
+
+          <div class="split-toolbar-center">
+            <button id="split-swap-panes-btn" class="split-tool-btn highlight" title="Swap Left and Right Panes">
+              <i data-lucide="arrow-left-right"></i>
+              <span>Swap Panes</span>
+            </button>
+            <div class="ratio-pill-group">
+              <button class="ratio-btn" data-ratio="30">30 / 70</button>
+              <button class="ratio-btn active" data-ratio="50">50 / 50</button>
+              <button class="ratio-btn" data-ratio="70">70 / 30</button>
+            </div>
+          </div>
+
+          <div class="split-toolbar-right">
+            <button id="split-left-fullscreen-btn" class="split-tool-btn" title="Maximize Left Pane">
+              <i data-lucide="maximize-2"></i>
+              <span>Left Only</span>
+            </button>
+            <button id="split-right-fullscreen-btn" class="split-tool-btn" title="Maximize Right Pane">
+              <i data-lucide="maximize-2"></i>
+              <span>Right Only</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Split Panes Container -->
+        <div class="split-workspace-canvas" id="split-canvas">
+          
+          <!-- LEFT PANE -->
+          <div class="workspace-pane" id="pane-left" style="width: 50%;">
+            
+            <!-- Pane Navigation & App Switcher Bar -->
+            <div class="pane-navbar">
+              <div class="pane-nav-left">
+                <span class="pane-brand-icon" id="left-pane-icon"><i data-lucide="globe"></i></span>
+                <span class="pane-app-title" id="left-pane-title">Google</span>
+                
+                <div class="nav-arrow-group">
+                  <button class="pane-nav-btn" id="left-back-btn" title="Back"><i data-lucide="chevron-left"></i></button>
+                  <button class="pane-nav-btn" id="left-forward-btn" title="Forward"><i data-lucide="chevron-right"></i></button>
+                  <button class="pane-nav-btn" id="left-reload-btn" title="Reload"><i data-lucide="rotate-cw"></i></button>
+                </div>
+              </div>
+
+              <!-- URL / Action Bar -->
+              <div class="pane-nav-center">
+                <input type="text" class="pane-url-input" id="left-url-input" placeholder="Enter URL or search query...">
+                <button class="pane-nav-btn" id="left-browse-pdf-btn" title="Choose PDF File from Laptop" style="display: none;">
+                  <i data-lucide="folder-open"></i> Browse PDF...
+                </button>
+              </div>
+
+              <!-- Pane App Switcher Dropdown -->
+              <div class="pane-nav-right">
+                <select class="app-switcher-select" id="left-app-select" title="Switch Left Application">
+                  <option value="google">Google Search</option>
+                  <option value="spotify">Spotify</option>
+                  <option value="github">GitHub</option>
+                  <option value="chatgpt">ChatGPT</option>
+                  <option value="notion">Notion</option>
+                  <option value="pdf">Local PDF</option>
+                  <option value="notes">Idea Notes</option>
+                  <option value="tasks">Task Board</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Pane Content View -->
+            <div class="pane-content-view" id="left-content-view">
+              <!-- Real webview, PDF viewer, or built-in tool dynamically inserted here -->
+            </div>
+          </div>
+
+          <!-- RESIZABLE SPLIT DIVIDER -->
+          <div class="split-resizer" id="split-resizer" title="Drag to adjust split ratio">
+            <div class="resizer-handle">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+
+          <!-- RIGHT PANE -->
+          <div class="workspace-pane" id="pane-right" style="width: 50%;">
+            
+            <!-- Pane Navigation & App Switcher Bar -->
+            <div class="pane-navbar">
+              <div class="pane-nav-left">
+                <span class="pane-brand-icon" id="right-pane-icon"><i data-lucide="book-open"></i></span>
+                <span class="pane-app-title" id="right-pane-title">Idea Notes</span>
+                
+                <div class="nav-arrow-group">
+                  <button class="pane-nav-btn" id="right-back-btn" title="Back"><i data-lucide="chevron-left"></i></button>
+                  <button class="pane-nav-btn" id="right-forward-btn" title="Forward"><i data-lucide="chevron-right"></i></button>
+                  <button class="pane-nav-btn" id="right-reload-btn" title="Reload"><i data-lucide="rotate-cw"></i></button>
+                </div>
+              </div>
+
+              <!-- URL / Action Bar -->
+              <div class="pane-nav-center">
+                <input type="text" class="pane-url-input" id="right-url-input" placeholder="Enter URL or search query...">
+                <button class="pane-nav-btn" id="right-browse-pdf-btn" title="Choose PDF File from Laptop" style="display: none;">
+                  <i data-lucide="folder-open"></i> Browse PDF...
+                </button>
+              </div>
+
+              <!-- Pane App Switcher Dropdown -->
+              <div class="pane-nav-right">
+                <select class="app-switcher-select" id="right-app-select" title="Switch Right Application">
+                  <option value="notes">Idea Notes</option>
+                  <option value="google">Google Search</option>
+                  <option value="spotify">Spotify</option>
+                  <option value="github">GitHub</option>
+                  <option value="chatgpt">ChatGPT</option>
+                  <option value="notion">Notion</option>
+                  <option value="pdf">Local PDF</option>
+                  <option value="tasks">Task Board</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Pane Content View -->
+            <div class="pane-content-view" id="right-content-view">
+              <!-- Real webview, PDF viewer, or built-in tool dynamically inserted here -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ======================================================== -->
+    <!-- DRAWER 1: COMMON PALETTE DRAWER                          -->
+    <!-- ======================================================== -->
+    <aside class="side-drawer" id="palette-drawer">
+      <div class="drawer-header">
+        <div class="drawer-title">
+          <i data-lucide="swatch-book"></i>
+          <span>Common Palette</span>
+        </div>
+        <button class="drawer-close-btn" id="close-palette-drawer-btn"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="drawer-tabs">
+        <button class="drawer-tab-btn active" data-tab="tab-snippets"><i data-lucide="clipboard"></i> Snippets</button>
+        <button class="drawer-tab-btn" data-tab="tab-sketch"><i data-lucide="palette"></i> Sketchpad</button>
+        <button class="drawer-tab-btn" data-tab="tab-swatches"><i data-lucide="sparkles"></i> Swatches</button>
+      </div>
+
+      <div class="drawer-body">
+        
+        <!-- Tab 1: Snippets -->
+        <div class="drawer-tab-pane active" id="tab-snippets">
+          <div class="drawer-input-row">
+            <textarea id="drawer-snippet-input" placeholder="Type or paste text, links, or code to store..."></textarea>
+            <button id="drawer-save-snippet-btn" class="tactile-btn primary"><i data-lucide="plus"></i> Save Snippet</button>
+          </div>
+          <div class="snippets-list" id="drawer-snippets-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Tab 2: Sketchpad -->
+        <div class="drawer-tab-pane" id="tab-sketch">
+          <div class="sketch-controls">
+            <div class="sketch-colors">
+              <button class="sketch-color-dot active" style="background:#1C1917" data-color="#1C1917"></button>
+              <button class="sketch-color-dot" style="background:#D94E1F" data-color="#D94E1F"></button>
+              <button class="sketch-color-dot" style="background:#1E3A2F" data-color="#1E3A2F"></button>
+              <button class="sketch-color-dot" style="background:#2563EB" data-color="#2563EB"></button>
+              <button class="sketch-color-dot" style="background:#FFFFFF" data-color="#FFFFFF"></button>
+            </div>
+            <input type="range" id="sketch-brush-size" min="1" max="16" value="4">
+            <button id="sketch-clear-btn" class="tactile-btn secondary"><i data-lucide="eraser"></i> Clear</button>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="drawer-sketch-canvas" width="300" height="220"></canvas>
+          </div>
+          <button id="sketch-save-btn" class="tactile-btn primary"><i data-lucide="image"></i> Save Sketch</button>
+          <div class="saved-sketches-grid" id="drawer-sketches-grid"></div>
+        </div>
+
+        <!-- Tab 3: Swatches -->
+        <div class="drawer-tab-pane" id="tab-swatches">
+          <div class="swatch-picker-row">
+            <input type="color" id="drawer-color-picker" value="#D94E1F">
+            <input type="text" id="drawer-color-hex" value="#D94E1F">
+            <button id="drawer-save-color-btn" class="tactile-btn primary">Save</button>
+          </div>
+          <div class="swatches-grid" id="drawer-colors-grid"></div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ======================================================== -->
+    <!-- DRAWER 2: AI ASSISTANT DRAWER                            -->
+    <!-- ======================================================== -->
+    <aside class="side-drawer" id="assistant-drawer">
+      <div class="drawer-header">
+        <div class="drawer-title">
+          <i data-lucide="bot"></i>
+          <span>Workspace AI Assistant</span>
+        </div>
+        <button class="drawer-close-btn" id="close-assistant-drawer-btn"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="assistant-chat-container">
+        <div class="assistant-messages" id="assistant-messages">
+          <div class="assistant-bubble bot">
+            <div class="bubble-header"><i data-lucide="bot"></i> <strong>Assistant Jarvis</strong></div>
+            <p>Hello! I am your Workspace Assistant. I can help automate sign-ins, open apps and URLs, take notes, and search the web.</p>
+            <div class="assistant-chips">
+              <button class="chat-hint" data-query="open spotify">"Open Spotify"</button>
+              <button class="chat-hint" data-query="open my gmail account">"Open Gmail"</button>
+              <button class="chat-hint" data-query="sign in into my account">"Sign in to account"</button>
+              <button class="chat-hint" data-query="launch dual pdf compare">"Launch Dual PDF"</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="assistant-input-box">
+          <textarea id="assistant-input" placeholder="Type a request (e.g. 'open github', 'enter my mail - user@gmail.com')..."></textarea>
+          <button id="assistant-send-btn" class="tactile-btn primary"><i data-lucide="send"></i></button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- HIDDEN NATIVE FILE INPUT FOR FALLBACK -->
+  <input type="file" id="pdf-file-selector" accept=".pdf" style="display: none;">
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ======================================================== -->
+  <!-- ADD APPLICATION OR SITE MODAL                            -->
+  <!-- ======================================================== -->
+  <div class="app-modal-overlay hidden" id="add-app-modal">
+    <div class="app-modal-dialog">
+      <div class="app-modal-header">
+        <div class="modal-title">
+          <i data-lucide="plus-circle"></i>
+          <span>Add Application or Web Site</span>
+        </div>
+        <button class="modal-close-btn" id="close-add-modal-btn"><i data-lucide="x"></i></button>
+      </div>
+
+      <!-- Modal Tabs -->
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" data-modal-tab="tab-local-app">
+          <i data-lucide="laptop"></i>
+          <span>Add Installed Laptop App (.exe / .lnk)</span>
+        </button>
+        <button class="modal-tab-btn" data-modal-tab="tab-web-app">
+          <i data-lucide="globe"></i>
+          <span>Add Web App / Custom URL</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        
+        <!-- TAB 1: LOCAL DESKTOP APP -->
+        <div class="modal-tab-content active" id="tab-local-app">
+          
+          <!-- Section 1: Browse Laptop for App -->
+          <div class="modal-subcard">
+            <h4>1. Browse Laptop for Executable or Shortcut</h4>
+            <p>Select any installed desktop application (<code>.exe</code>, <code>.lnk</code>, <code>.bat</code>) from your computer.</p>
+            <button id="modal-browse-app-btn" class="tactile-btn primary" style="margin-top: 10px;">
+              <i data-lucide="folder-search"></i>
+              <span>Browse Laptop for App (.exe / .lnk)...</span>
+            </button>
+
+            <!-- Auto-filled App Details Form -->
+            <div class="modal-form-grid" id="local-app-form-grid" style="display: none; margin-top: 16px;">
+              <div class="form-preview-col">
+                <div class="app-icon-preview-box" id="picked-icon-preview">
+                  <i data-lucide="terminal"></i>
+                </div>
+              </div>
+              <div class="form-fields-col">
+                <div class="form-field">
+                  <label>App Name</label>
+                  <input type="text" id="picked-app-name" placeholder="Application Name (e.g. VS Code, VLC)">
+                </div>
+                <div class="form-field">
+                  <label>Executable Path</label>
+                  <input type="text" id="picked-app-path" readonly style="font-family: var(--font-mono); font-size: 11px;">
+                </div>
+                <div class="form-field">
+                  <label>Category</label>
+                  <select id="picked-app-category">
+                    <option value="Development">Development</option>
+                    <option value="Productivity" selected>Productivity</option>
+                    <option value="Media">Media</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <button id="modal-save-picked-app-btn" class="tactile-btn primary" style="margin-top: 10px;">
+                  <i data-lucide="plus"></i> Add App to Workspace
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Auto-Detected Installed Apps (One-Click Add) -->
+          <div class="modal-subcard" style="margin-top: 16px;">
+            <div class="subcard-header-row">
+              <h4>2. Auto-Detected Installed Apps (One-Click Add)</h4>
+              <span class="detected-count-badge" id="detected-apps-count">Scanning...</span>
+            </div>
+            <p>Click <strong>[+ Add]</strong> next to any detected program from your Windows Start Menu & Desktop:</p>
+
+            <div class="detected-search-box">
+              <i data-lucide="search"></i>
+              <input type="text" id="detected-app-search" placeholder="Filter detected programs (e.g. Chrome, Notepad, VLC, Code)...">
+            </div>
+
+            <div class="detected-apps-list" id="detected-apps-list">
+              <div style="padding: 16px; color: var(--ink-muted); font-size: 12px; font-style: italic;">
+                Scanning Start Menu and Desktop shortcuts for installed laptop programs...
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- TAB 2: WEB APP / URL -->
+        <div class="modal-tab-content" id="tab-web-app">
+          <div class="modal-subcard">
+            <h4>Add Any Web Application or Site URL</h4>
+            <p>Enter a web service or site address to embed inside App-Pair Workspace.</p>
+
+            <div class="form-fields-col" style="margin-top: 16px; gap: 12px;">
+              <div class="form-field">
+                <label>Web App Name</label>
+                <input type="text" id="web-app-name-input" placeholder="e.g. Excalidraw, Claude AI, LeetCode">
+              </div>
+              <div class="form-field">
+                <label>Website URL</label>
+                <input type="text" id="web-app-url-input" placeholder="https://excalidraw.com">
+              </div>
+              <div class="form-field">
+                <label>Category</label>
+                <select id="web-app-category-input">
+                  <option value="Productivity" selected>Productivity</option>
+                  <option value="Development">Development</option>
+                  <option value="Media">Media</option>
+                  <option value="Utilities">Utilities</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <button id="modal-save-web-app-btn" class="tactile-btn primary" style="margin-top: 10px; align-self: flex-start;">
+                <i data-lucide="plus"></i> Add Web App to Workspace
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="vendor/pdf.min.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
