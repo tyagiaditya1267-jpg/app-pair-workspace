@@ -138,6 +138,7 @@ const PAIRS_CONFIG = {
 const activePdfBlobs = { left: null, right: null };
 const activePdfBytes = { left: null, right: null };
 const activePdfDocs = { left: null, right: null };
+const activePdfPageTexts = { left: {}, right: {} };
 const pdfZoomLevels = { left: 1.15, right: 1.15 };
 const pdfCurrentPages = { left: 1, right: 1 };
 const pdfViewModes = { left: 'canvas', right: 'canvas' }; // 'canvas' | 'native'
@@ -1262,7 +1263,7 @@ function renderOfflineNotionDocs(side, container) {
 }
 
 // ==========================================================================
-// ROBUST LOCAL PDF VIEWER COMPONENT (PDF.js Canvas + Typed Blob Embed)
+// ROBUST LOCAL PDF VIEWER COMPONENT (PDF.js Canvas + Selectable Text Layer + Typed Blob Embed)
 // ==========================================================================
 async function renderPdfViewerComponent(side, initialFile, container) {
   const pdfData = await resolvePdfData(initialFile);
@@ -1276,6 +1277,7 @@ async function renderPdfViewerComponent(side, initialFile, container) {
   }
   activePdfBlobs[side] = pdfData.blobUrl;
   activePdfBytes[side] = pdfData.bytes;
+  activePdfPageTexts[side] = {};
 
   const fileName = pdfData.name || initialFile.split(/[\\/]/).pop();
   const currentZoom = pdfZoomLevels[side] || 1.15;
@@ -1306,11 +1308,17 @@ async function renderPdfViewerComponent(side, initialFile, container) {
         <span class="pdf-file-label" id="${side}-pdf-zoom-label" style="min-width:38px; text-align:center;">${Math.round(currentZoom * 100)}%</span>
         <button class="pdf-ctrl-btn" id="${side}-pdf-zoom-in" title="Zoom In">+</button>
         <button class="pdf-ctrl-btn" id="${side}-pdf-fit-width" title="Fit to Pane Width">Fit</button>
+
+        <span style="color:#57534E;">|</span>
+
+        <button class="pdf-ctrl-btn" id="${side}-pdf-copy-page-btn" title="Copy all text from the current PDF page">
+          <i data-lucide="copy"></i> Copy Page Text
+        </button>
       </div>
 
       <div class="pdf-bar-right">
-        <button class="pdf-ctrl-btn" id="${side}-pdf-toggle-mode" title="Toggle between PDF.js canvas and native Chromium viewer">
-          ⇄ ${viewMode === 'canvas' ? 'Native View' : 'Canvas View'}
+        <button class="pdf-ctrl-btn" id="${side}-pdf-toggle-mode" title="Toggle between PDF.js canvas with text selection and native Chromium viewer">
+          <i data-lucide="layers"></i> <span>Mode: ${viewMode === 'canvas' ? 'Canvas + Text' : 'Native PDF'}</span>
         </button>
         <button class="pdf-ctrl-btn primary" id="${side}-reselect-pdf-btn">
           <i data-lucide="folder-open"></i> Change PDF...
@@ -1318,7 +1326,20 @@ async function renderPdfViewerComponent(side, initialFile, container) {
       </div>
     </div>
 
-    <!-- Mode A: PDF.js Canvas Page Viewport -->
+    <!-- Floating Selection Action Bar (Feature Upgrade) -->
+    <div class="pdf-floating-toolbar hidden" id="${side}-pdf-floating-toolbar">
+      <button class="pdf-float-btn" id="${side}-float-copy-btn" title="Copy text to clipboard (Ctrl+C)">
+        <i data-lucide="copy"></i> Copy Text (Ctrl+C)
+      </button>
+      <button class="pdf-float-btn accent" id="${side}-float-notes-btn" title="Send selected text to Idea Notes editor">
+        <i data-lucide="arrow-right-circle"></i> &gt;&gt; Send to Idea Notes
+      </button>
+      <button class="pdf-float-btn" id="${side}-float-palette-btn" title="Push selected text to Common Palette">
+        <i data-lucide="share-2"></i> Push to Palette
+      </button>
+    </div>
+
+    <!-- Mode A: PDF.js Canvas Page Viewport with Text Selection Overlay -->
     <div class="pdf-canvas-viewport" id="${side}-pdf-canvas-viewport" style="${viewMode === 'canvas' ? '' : 'display:none;'}">
       <div style="color:var(--espresso); padding:24px; font-family:var(--font-mono); font-size:12px;">Rendering PDF document...</div>
     </div>
@@ -1335,6 +1356,7 @@ async function renderPdfViewerComponent(side, initialFile, container) {
   const totalPagesEl = pdfContainer.querySelector(`#${side}-pdf-total-pages`);
   const pageInp = pdfContainer.querySelector(`#${side}-pdf-page-inp`);
   const zoomLabel = pdfContainer.querySelector(`#${side}-pdf-zoom-label`);
+  const floatingBar = pdfContainer.querySelector(`#${side}-pdf-floating-toolbar`);
 
   await renderPdfJsCanvasPages(side, pdfData.bytes, canvasViewport, totalPagesEl);
 
@@ -1372,24 +1394,155 @@ async function renderPdfViewerComponent(side, initialFile, container) {
     if (val >= 1 && val <= max) scrollToPage(val);
   });
 
+  // Copy Full Page Text Button
+  const copyPageBtn = pdfContainer.querySelector(`#${side}-pdf-copy-page-btn`);
+  if (copyPageBtn) {
+    copyPageBtn.addEventListener('click', () => {
+      const curP = pdfCurrentPages[side] || 1;
+      const text = activePdfPageTexts[side]?.[curP];
+      if (text && text.trim()) {
+        navigator.clipboard.writeText(text.trim());
+        showToast(`Copied Page ${curP} text (${text.trim().length} chars)!`);
+      } else {
+        showToast(`No text found on Page ${curP}`);
+      }
+    });
+  }
+
+  // Toggle Mode (Canvas + Text vs Native PDF)
   const toggleBtn = pdfContainer.querySelector(`#${side}-pdf-toggle-mode`);
   toggleBtn.addEventListener('click', () => {
     if (pdfViewModes[side] === 'canvas') {
       pdfViewModes[side] = 'native';
       canvasViewport.style.display = 'none';
       nativeFrame.style.display = 'block';
-      toggleBtn.innerText = '⇄ Canvas View';
+      toggleBtn.innerHTML = '<i data-lucide="layers"></i> <span>Mode: Native PDF</span>';
+      showToast('Switched to Native Chromium PDF Viewer');
     } else {
       pdfViewModes[side] = 'canvas';
-      canvasViewport.style.display = 'flex';
+      canvasViewport.style.display = 'block';
       nativeFrame.style.display = 'none';
-      toggleBtn.innerText = '⇄ Native View';
+      toggleBtn.innerHTML = '<i data-lucide="layers"></i> <span>Mode: Canvas + Text</span>';
+      showToast('Switched to Canvas + Selectable Text');
     }
+    if (window.lucide) window.lucide.createIcons();
   });
 
   pdfContainer.querySelector(`#${side}-reselect-pdf-btn`).addEventListener('click', () => {
     pickLocalPdfFile(side, (newPdfData) => loadPdfInPane(side, newPdfData));
   });
+
+  // Floating Action Bar & Text Selection Handling
+  let lastSelectedPdfText = '';
+
+  const updateFloatingToolbarPosition = () => {
+    const sel = window.getSelection();
+    const selectedText = sel ? sel.toString().trim() : '';
+
+    if (!selectedText) {
+      if (floatingBar) floatingBar.classList.add('hidden');
+      lastSelectedPdfText = '';
+      return;
+    }
+
+    if (!sel.rangeCount || !pdfContainer.contains(sel.anchorNode)) {
+      if (floatingBar) floatingBar.classList.add('hidden');
+      return;
+    }
+
+    lastSelectedPdfText = selectedText;
+
+    try {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const containerRect = pdfContainer.getBoundingClientRect();
+
+      if (rect.width > 0 && rect.height > 0) {
+        const topPos = Math.max(46, rect.top - containerRect.top - 46);
+        const leftPos = Math.max(12, Math.min(containerRect.width - 340, rect.left - containerRect.left + (rect.width / 2) - 160));
+
+        floatingBar.style.top = `${topPos}px`;
+        floatingBar.style.left = `${leftPos}px`;
+        floatingBar.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      }
+    } catch (err) {
+      floatingBar.classList.remove('hidden');
+    }
+  };
+
+  pdfContainer.addEventListener('mouseup', () => {
+    setTimeout(updateFloatingToolbarPosition, 30);
+  });
+
+  pdfContainer.addEventListener('keyup', (e) => {
+    if (['Shift', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      updateFloatingToolbarPosition();
+    }
+  });
+
+  // Copy (Ctrl+C / Cmd+C) inside PDF
+  pdfContainer.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+      const selText = window.getSelection()?.toString()?.trim();
+      if (selText) {
+        navigator.clipboard.writeText(selText);
+        showToast('Copied selected text (Ctrl+C)!');
+      }
+    }
+  });
+
+  // Right-Click Copy
+  pdfContainer.addEventListener('contextmenu', (e) => {
+    const selText = window.getSelection()?.toString()?.trim();
+    if (selText) {
+      navigator.clipboard.writeText(selText);
+      showToast('Copied selected text to clipboard!');
+    }
+  });
+
+  // Floating Action Bar Buttons
+  const floatCopyBtn = pdfContainer.querySelector(`#${side}-float-copy-btn`);
+  if (floatCopyBtn) {
+    floatCopyBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    floatCopyBtn.addEventListener('click', () => {
+      const textToCopy = lastSelectedPdfText || window.getSelection()?.toString()?.trim();
+      if (textToCopy) {
+        navigator.clipboard.writeText(textToCopy);
+        showToast('Copied text to clipboard!');
+        if (floatingBar) floatingBar.classList.add('hidden');
+      }
+    });
+  }
+
+  const floatNotesBtn = pdfContainer.querySelector(`#${side}-float-notes-btn`);
+  if (floatNotesBtn) {
+    floatNotesBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    floatNotesBtn.addEventListener('click', () => {
+      const textToSend = lastSelectedPdfText || window.getSelection()?.toString()?.trim();
+      if (textToSend) {
+        const otherSide = side === 'left' ? 'right' : 'left';
+        pasteIntoNotesPane(textToSend, otherSide);
+        showToast('Inserted selection into Idea Notes!');
+        if (floatingBar) floatingBar.classList.add('hidden');
+      }
+    });
+  }
+
+  const floatPaletteBtn = pdfContainer.querySelector(`#${side}-float-palette-btn`);
+  if (floatPaletteBtn) {
+    floatPaletteBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    floatPaletteBtn.addEventListener('click', () => {
+      const textToPush = lastSelectedPdfText || window.getSelection()?.toString()?.trim();
+      if (textToPush) {
+        appState.snippets.unshift(textToPush);
+        persistStorage();
+        renderSnippetsList();
+        showToast('Pushed selection to Common Palette!');
+        if (floatingBar) floatingBar.classList.add('hidden');
+      }
+    });
+  }
 }
 
 async function renderPdfJsCanvasPages(side, bytes, viewportEl, totalPagesEl) {
@@ -1402,6 +1555,7 @@ async function renderPdfJsCanvasPages(side, bytes, viewportEl, totalPagesEl) {
     const loadingTask = window.pdfjsLib.getDocument({ data: bytes.slice() });
     const pdfDoc = await loadingTask.promise;
     activePdfDocs[side] = pdfDoc;
+    activePdfPageTexts[side] = {};
     viewportEl.innerHTML = '';
 
     const numPages = pdfDoc.numPages;
@@ -1416,13 +1570,22 @@ async function renderPdfJsCanvasPages(side, bytes, viewportEl, totalPagesEl) {
       const pageWrapper = document.createElement('div');
       pageWrapper.className = 'pdf-page-wrapper';
       pageWrapper.id = `${side}-page-${pageNum}`;
+      pageWrapper.style.width = `${viewport.width}px`;
+      pageWrapper.style.height = `${viewport.height}px`;
 
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
+      const textLayerDiv = document.createElement('div');
+      textLayerDiv.className = 'pdf-text-layer';
+      textLayerDiv.style.width = `${viewport.width}px`;
+      textLayerDiv.style.height = `${viewport.height}px`;
+      textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+
       pageWrapper.appendChild(canvas);
+      pageWrapper.appendChild(textLayerDiv);
       viewportEl.appendChild(pageWrapper);
 
       const renderContext = {
@@ -1430,6 +1593,45 @@ async function renderPdfJsCanvasPages(side, bytes, viewportEl, totalPagesEl) {
         viewport: viewport
       };
       await page.render(renderContext).promise;
+
+      // Extract and render selectable text overlay
+      const textContent = await page.getTextContent();
+      activePdfPageTexts[side][pageNum] = textContent.items.map(i => i.str).filter(Boolean).join(' ');
+
+      let renderedTextLayer = false;
+      if (window.pdfjsLib && typeof window.pdfjsLib.renderTextLayer === 'function') {
+        try {
+          const textLayerTask = window.pdfjsLib.renderTextLayer({
+            textContentSource: textContent,
+            container: textLayerDiv,
+            viewport: viewport,
+            textDivs: []
+          });
+          if (textLayerTask && textLayerTask.promise) {
+            await textLayerTask.promise;
+            renderedTextLayer = true;
+          }
+        } catch (err) {
+          console.warn('pdfjsLib.renderTextLayer error:', err);
+        }
+      }
+
+      if (!renderedTextLayer) {
+        // Precise manual transform fallback
+        textLayerDiv.innerHTML = '';
+        for (const item of textContent.items) {
+          if (!item.str) continue;
+          const tx = window.pdfjsLib.Util.transform(viewport.transform, item.transform);
+          const fontHeight = Math.hypot(tx[2], tx[3]) || (item.height * viewport.scale) || 12;
+          const span = document.createElement('span');
+          span.textContent = item.str;
+          span.style.left = `${tx[4]}px`;
+          span.style.top = `${tx[5] - fontHeight}px`;
+          span.style.fontSize = `${fontHeight}px`;
+          span.style.fontFamily = item.fontName || 'sans-serif';
+          textLayerDiv.appendChild(span);
+        }
+      }
     }
   } catch (err) {
     console.error('PDF.js render error:', err);
