@@ -104,6 +104,14 @@
           <i data-lucide="book-open"></i>
           <span class="side-tooltip">Idea Notes</span>
         </button>
+        <button class="side-btn" id="side-word-btn" title="In-App Word Document (.docx) Studio">
+          <i data-lucide="file-edit"></i>
+          <span class="side-tooltip">Word Doc Studio</span>
+        </button>
+        <button class="side-btn" id="side-history-btn" title="Usage History & Screen Time Analytics">
+          <i data-lucide="clock"></i>
+          <span class="side-tooltip">Screen Time & History</span>
+        </button>
         <button class="side-btn" id="side-tasks-btn" title="Kanban Tasks">
           <i data-lucide="check-square"></i>
           <span class="side-tooltip">Task Board</span>
@@ -178,6 +186,7 @@
                 <span class="slot-label">LEFT PANE APP</span>
                 <select id="builder-left-select" class="builder-select">
                   <option value="google">Google Search & Browser</option>
+                  <option value="word">Word Document (.docx) Studio</option>
                   <option value="spotify">Spotify Web Player</option>
                   <option value="github">GitHub Repositories</option>
                   <option value="chatgpt">ChatGPT Assistant</option>
@@ -197,6 +206,7 @@
                 <span class="slot-label">RIGHT PANE APP</span>
                 <select id="builder-right-select" class="builder-select">
                   <option value="notes" selected>Idea Notes</option>
+                  <option value="word">Word Document (.docx) Studio</option>
                   <option value="google">Google Search & Browser</option>
                   <option value="spotify">Spotify Web Player</option>
                   <option value="github">GitHub Repositories</option>
@@ -220,6 +230,45 @@
                 <i data-lucide="play"></i>
                 <span>Launch Pair</span>
               </button>
+            </div>
+          </div>
+
+          <!-- SCREEN TIME & USAGE SUMMARY STRIP (Feature 3) -->
+          <div class="screen-time-summary-strip" id="hub-screen-time-strip">
+            <div class="summary-left">
+              <div class="clock-icon-box"><i data-lucide="clock"></i></div>
+              <div class="summary-info">
+                <span class="summary-tag">TODAY'S WORKSPACE SCREEN TIME</span>
+                <h4 class="summary-time" id="hub-today-screen-time">0h 00m</h4>
+              </div>
+            </div>
+            <div class="summary-top-apps" id="hub-top-apps-strip">
+              <span class="strip-empty-label">Tracking active time across open apps...</span>
+            </div>
+            <button class="tactile-btn secondary small" id="hub-view-analytics-btn">
+              <i data-lucide="bar-chart-2"></i>
+              <span>View Full Analytics & History &rarr;</span>
+            </button>
+          </div>
+
+          <!-- SAVED WORD DOCUMENTS SHELF (Feature 6) -->
+          <div class="word-shelf-card" id="hub-word-shelf-section">
+            <div class="word-shelf-header">
+              <div class="title-with-count">
+                <i data-lucide="file-type"></i>
+                <h3>Saved Word Documents (Continue Where You Left Off)</h3>
+                <span class="section-badge" id="word-saved-count-badge">0 SAVED</span>
+              </div>
+              <div class="shelf-actions">
+                <button class="tactile-btn secondary small" id="hub-open-docx-laptop-btn"><i data-lucide="folder-open"></i> Open .docx from Laptop...</button>
+                <button class="tactile-btn primary small" id="hub-new-word-doc-btn"><i data-lucide="file-plus"></i> New Word Doc</button>
+              </div>
+            </div>
+            <div class="word-docs-shelf-grid" id="hub-word-docs-shelf">
+              <div class="empty-shelf-box">
+                <i data-lucide="file-text"></i>
+                <p>No saved documents yet. Click <strong>"New Word Doc"</strong> or <strong>"Open .docx from Laptop..."</strong> to write and edit inside the workspace.</p>
+              </div>
             </div>
           </div>
 
@@ -506,6 +555,26 @@
                 <button class="open-app-btn">Open</button>
               </div>
 
+              <!-- In-App Word Document Studio (Feature 6) -->
+              <div class="single-app-card" data-launch="word">
+                <div class="single-app-icon"><i data-lucide="file-edit"></i></div>
+                <div class="single-app-meta">
+                  <h4>Word Document Studio</h4>
+                  <span>In-App .docx Editor</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
+              <!-- Usage History & Screen Time (Feature 3) -->
+              <div class="single-app-card" data-launch="usage">
+                <div class="single-app-icon"><i data-lucide="clock"></i></div>
+                <div class="single-app-meta">
+                  <h4>Usage &amp; Screen Time</h4>
+                  <span>App Hours &amp; Sessions</span>
+                </div>
+                <button class="open-app-btn">Open</button>
+              </div>
+
               <!-- Common Palette -->
               <div class="single-app-card" data-launch="palette">
                 <div class="single-app-icon"><i data-lucide="swatch-book"></i></div>
@@ -592,6 +661,7 @@
               <div class="pane-nav-right">
                 <select class="app-switcher-select" id="left-app-select" title="Switch Left Application">
                   <option value="google">Google Search</option>
+                  <option value="word">Word Document (.docx)</option>
                   <option value="spotify">Spotify</option>
                   <option value="github">GitHub</option>
                   <option value="chatgpt">ChatGPT</option>
@@ -646,6 +716,7 @@
               <div class="pane-nav-right">
                 <select class="app-switcher-select" id="right-app-select" title="Switch Right Application">
                   <option value="notes">Idea Notes</option>
+                  <option value="word">Word Document (.docx)</option>
                   <option value="google">Google Search</option>
                   <option value="spotify">Spotify</option>
                   <option value="github">GitHub</option>
@@ -660,6 +731,188 @@
             <!-- Pane Content View -->
             <div class="pane-content-view" id="right-content-view">
               <!-- Real webview, PDF viewer, or built-in tool dynamically inserted here -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- VIEW 3: USAGE HISTORY & SCREEN TIME ANALYTICS (Feature 3) -->
+      <!-- ======================================================== -->
+      <section class="usage-history-view hidden" id="usage-history-view">
+        <div class="usage-container">
+          
+          <div class="usage-header">
+            <div class="usage-header-left">
+              <button id="usage-back-hub-btn" class="tactile-btn secondary"><i data-lucide="layout-grid"></i> Workspace Launcher</button>
+              <div class="usage-title-row">
+                <h1 class="usage-heading"><i data-lucide="clock"></i> Screen Time &amp; App Usage History</h1>
+                <span class="hub-version-tag">STATION TELEMETRY</span>
+              </div>
+            </div>
+            <div class="usage-header-right">
+              <button id="usage-reset-btn" class="tactile-btn secondary danger-hover small"><i data-lucide="rotate-ccw"></i> Reset Telemetry</button>
+            </div>
+          </div>
+
+          <!-- Top Metric Cards Grid -->
+          <div class="usage-metric-cards-grid">
+            <div class="usage-metric-card">
+              <span class="metric-card-label">TOTAL WORKSPACE SCREEN TIME</span>
+              <h2 class="metric-card-val" id="metric-total-time">0h 00m</h2>
+              <span class="metric-card-sub">Active interactive duration</span>
+            </div>
+            <div class="usage-metric-card">
+              <span class="metric-card-label">TOP APPLICATION</span>
+              <h2 class="metric-card-val" id="metric-top-app">None</h2>
+              <span class="metric-card-sub" id="metric-top-app-time">0h 00m active</span>
+            </div>
+            <div class="usage-metric-card">
+              <span class="metric-card-label">TOTAL SESSIONS RECORDED</span>
+              <h2 class="metric-card-val" id="metric-total-sessions">0</h2>
+              <span class="metric-card-sub">Workflow launches logged</span>
+            </div>
+            <div class="usage-metric-card">
+              <span class="metric-card-label">MOST FREQUENT PAIR</span>
+              <h2 class="metric-card-val" id="metric-top-pair">None</h2>
+              <span class="metric-card-sub" id="metric-top-pair-time">0h 00m paired</span>
+            </div>
+          </div>
+
+          <!-- Total Time Spent Per App Horizontal Progress Bars -->
+          <div class="usage-card">
+            <div class="card-title-bar">
+              <div class="title-with-count">
+                <i data-lucide="bar-chart-2"></i>
+                <h3>Total Time Spent Per App (Hours &amp; Minutes)</h3>
+                <span class="section-badge">RANKED BY USAGE</span>
+              </div>
+              <span class="section-meta">Continuous 1-second active tracking</span>
+            </div>
+            <div class="app-time-bars-list" id="usage-app-bars">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Chronological Session History Log Table -->
+          <div class="usage-card">
+            <div class="card-title-bar">
+              <div class="title-with-count">
+                <i data-lucide="list"></i>
+                <h3>Chronological Session History Log</h3>
+                <span class="section-badge" id="usage-session-count-badge">0 SESSIONS</span>
+              </div>
+              <span class="section-meta">Click [Re-open Session] to instantly relaunch exact apps &amp; split ratio</span>
+            </div>
+            <div class="table-responsive">
+              <table class="session-history-table">
+                <thead>
+                  <tr>
+                    <th>App / Session</th>
+                    <th>Paired With</th>
+                    <th>Date &amp; Time</th>
+                    <th>Duration</th>
+                    <th style="text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="session-history-tbody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- VIEW 4: IN-APP WORD DOCUMENT STUDIO (Feature 6)          -->
+      <!-- ======================================================== -->
+      <section class="word-doc-view hidden" id="word-doc-view">
+        <div class="word-studio-container">
+          
+          <!-- Top Action Toolbar -->
+          <div class="word-top-bar">
+            <div class="word-top-left">
+              <button id="word-back-hub-btn" class="tactile-btn secondary small"><i data-lucide="layout-grid"></i> Hub</button>
+              <div class="doc-title-wrapper">
+                <i data-lucide="file-type"></i>
+                <input type="text" id="word-doc-title-input" value="Specification Notes.docx" placeholder="Document Title...">
+              </div>
+              <span class="word-autosave-badge" id="word-autosave-badge"><i data-lucide="check-circle"></i> Auto-saved in Workspace</span>
+            </div>
+
+            <div class="word-top-right">
+              <span class="word-metrics-pill" id="word-metrics-pill">0 words &bull; 0 chars</span>
+              <button id="word-open-laptop-btn" class="tactile-btn small secondary" title="Open real .docx file from laptop"><i data-lucide="folder-open"></i> Open .docx...</button>
+              <button id="word-save-workspace-btn" class="tactile-btn small primary" title="Save in App Workspace"><i data-lucide="save"></i> Save in Workspace</button>
+              <button id="word-export-docx-btn" class="tactile-btn small accent" title="Export to standard .docx file"><i data-lucide="download"></i> Export to .docx</button>
+            </div>
+          </div>
+
+          <!-- Formatting Ribbon Toolbar -->
+          <div class="word-format-ribbon">
+            <div class="ribbon-group">
+              <select id="word-heading-select" class="ribbon-select" title="Text Style">
+                <option value="p">Normal Text</option>
+                <option value="h1">Heading 1</option>
+                <option value="h2">Heading 2</option>
+                <option value="h3">Heading 3</option>
+                <option value="blockquote">Quote</option>
+              </select>
+              <select id="word-font-select" class="ribbon-select" title="Font Family">
+                <option value="Inter, sans-serif">Inter</option>
+                <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Courier New', monospace">Courier New</option>
+              </select>
+            </div>
+
+            <div class="ribbon-divider"></div>
+
+            <div class="ribbon-group">
+              <button class="ribbon-btn" id="word-cmd-bold" title="Bold (Ctrl+B)"><i data-lucide="bold"></i></button>
+              <button class="ribbon-btn" id="word-cmd-italic" title="Italic (Ctrl+I)"><i data-lucide="italic"></i></button>
+              <button class="ribbon-btn" id="word-cmd-underline" title="Underline (Ctrl+U)"><i data-lucide="underline"></i></button>
+              <button class="ribbon-btn" id="word-cmd-strike" title="Strikethrough"><i data-lucide="strikethrough"></i></button>
+            </div>
+
+            <div class="ribbon-divider"></div>
+
+            <div class="ribbon-group">
+              <button class="ribbon-btn" id="word-cmd-ul" title="Bullet List"><i data-lucide="list"></i></button>
+              <button class="ribbon-btn" id="word-cmd-ol" title="Numbered List"><i data-lucide="list-ordered"></i></button>
+              <button class="ribbon-btn" id="word-cmd-table" title="Insert 3x3 Table"><i data-lucide="table"></i></button>
+            </div>
+
+            <div class="ribbon-divider"></div>
+
+            <div class="ribbon-group">
+              <button class="ribbon-btn" id="word-cmd-align-left" title="Align Left"><i data-lucide="align-left"></i></button>
+              <button class="ribbon-btn" id="word-cmd-align-center" title="Align Center"><i data-lucide="align-center"></i></button>
+              <button class="ribbon-btn" id="word-cmd-align-right" title="Align Right"><i data-lucide="align-right"></i></button>
+            </div>
+
+            <div class="ribbon-divider"></div>
+
+            <div class="ribbon-group">
+              <button class="ribbon-btn" id="word-cmd-clear" title="Clear Formatting"><i data-lucide="remove-formatting"></i></button>
+            </div>
+          </div>
+
+          <!-- Main Word Canvas Paper Container -->
+          <div class="word-canvas-wrapper">
+            <div class="word-page-sheet" id="word-editable-canvas" contenteditable="true" spellcheck="true">
+              <h1>Project Specification &amp; Architecture Notes</h1>
+              <p>Welcome to the <strong>In-App Word Document Studio</strong>. You can open any real <code>.docx</code> file from your laptop, write with full rich-text formatting, and your work will be automatically saved in the app workspace so you can resume anytime.</p>
+              <h2>Key Highlights</h2>
+              <ul>
+                <li><strong>Real .docx Parsing</strong>: Open existing Word documents with intact paragraphs and structure.</li>
+                <li><strong>Persistent Resume</strong>: Autosaved every 3 seconds to App Workspace storage.</li>
+                <li><strong>Export Ready</strong>: Save directly back to <code>.docx</code> format on your laptop.</li>
+              </ul>
             </div>
           </div>
 
@@ -688,12 +941,52 @@
 
       <div class="drawer-body">
         
-        <!-- Tab 1: Snippets -->
+        <!-- Tab 1: Snippets & Auto-Paste Bridge -->
         <div class="drawer-tab-pane active" id="tab-snippets">
           <div class="drawer-input-row">
-            <textarea id="drawer-snippet-input" placeholder="Type or paste text, links, or code to store..."></textarea>
+            <textarea id="drawer-snippet-input" placeholder="Type or paste text, links, or code to store or auto-paste..."></textarea>
             <button id="drawer-save-snippet-btn" class="tactile-btn primary"><i data-lucide="plus"></i> Save Snippet</button>
           </div>
+
+          <!-- COMMON PALETTE AUTO-PASTE BRIDGE (Feature 4) -->
+          <div class="palette-bridge-card">
+            <div class="bridge-header">
+              <span class="bridge-tag"><i data-lucide="send"></i> AUTO-PASTE BRIDGE</span>
+              <span class="bridge-sub">Send scratchpad text to external or split apps</span>
+            </div>
+            
+            <div class="palette-action-buttons">
+              <button id="palette-paste-split-btn" class="palette-bridge-btn" title="Paste directly into current active split pane">
+                <i data-lucide="arrow-right-left"></i>
+                <span>Paste to Active Split Pane &gt;&gt;</span>
+              </button>
+              
+              <div class="palette-bridge-row">
+                <button id="palette-paste-notepad-btn" class="palette-bridge-btn" title="Send and open in Windows Notepad (.exe)">
+                  <i data-lucide="file-text"></i>
+                  <span>Send &amp; Paste to Notepad (.exe)</span>
+                </button>
+                <button id="palette-paste-word-btn" class="palette-bridge-btn" title="Insert into Word Doc Studio or Microsoft Word">
+                  <i data-lucide="file-type"></i>
+                  <span>Send &amp; Paste to Word</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Auto-Sync Palette Paste Toggle -->
+            <div class="palette-sync-control-row">
+              <label class="palette-sync-label">
+                <input type="checkbox" id="palette-auto-sync-toggle">
+                <span>Auto-Sync Palette Paste to:</span>
+              </label>
+              <select id="palette-sync-target-select" class="palette-sync-select">
+                <option value="notes" selected>Idea Notes</option>
+                <option value="word">Word Document</option>
+                <option value="notepad">Notepad (.exe)</option>
+              </select>
+            </div>
+          </div>
+
           <div class="snippets-list" id="drawer-snippets-list">
             <!-- Dynamically populated -->
           </div>
@@ -838,9 +1131,30 @@
                     <option value="Other">Other</option>
                   </select>
                 </div>
-                <button id="modal-save-picked-app-btn" class="tactile-btn primary" style="margin-top: 10px;">
-                  <i data-lucide="plus"></i> Add App to Workspace
-                </button>
+
+                <!-- Pair & Open in Half-Window Option (Feature 2) -->
+                <div class="form-field" style="margin-top: 6px;">
+                  <label><i data-lucide="columns"></i> Pair &amp; Open in Half-Window With:</label>
+                  <select id="picked-app-companion-select" class="companion-app-select">
+                    <option value="notes" selected>Idea Notes (Default)</option>
+                    <option value="word">Word Document Studio</option>
+                    <option value="google">Google Search &amp; Browser</option>
+                    <option value="chatgpt">ChatGPT Assistant</option>
+                    <option value="github">GitHub</option>
+                    <option value="spotify">Spotify</option>
+                    <option value="pdf">Local PDF Reader</option>
+                    <option value="tasks">Task Board</option>
+                  </select>
+                </div>
+
+                <div class="modal-btn-row" style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+                  <button id="modal-save-picked-app-btn" class="tactile-btn primary">
+                    <i data-lucide="plus"></i> Add App to Workspace
+                  </button>
+                  <button id="modal-split-picked-app-btn" class="tactile-btn accent">
+                    <i data-lucide="columns"></i> + Add &amp; Open in 50/50 Split
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -851,7 +1165,7 @@
               <h4>2. Auto-Detected Installed Apps (One-Click Add)</h4>
               <span class="detected-count-badge" id="detected-apps-count">Scanning...</span>
             </div>
-            <p>Click <strong>[+ Add]</strong> next to any detected program from your Windows Start Menu & Desktop:</p>
+            <p>Click <strong>[+ Add]</strong> or <strong>[Split 50/50]</strong> next to any detected program:</p>
 
             <div class="detected-search-box">
               <i data-lucide="search"></i>
@@ -892,9 +1206,30 @@
                   <option value="Other">Other</option>
                 </select>
               </div>
-              <button id="modal-save-web-app-btn" class="tactile-btn primary" style="margin-top: 10px; align-self: flex-start;">
-                <i data-lucide="plus"></i> Add Web App to Workspace
-              </button>
+
+              <!-- Pair & Open in Half-Window Option (Feature 2) -->
+              <div class="form-field">
+                <label><i data-lucide="columns"></i> Pair &amp; Open in Half-Window With:</label>
+                <select id="web-app-companion-select" class="companion-app-select">
+                  <option value="notes" selected>Idea Notes (Default)</option>
+                  <option value="word">Word Document Studio</option>
+                  <option value="google">Google Search &amp; Browser</option>
+                  <option value="chatgpt">ChatGPT Assistant</option>
+                  <option value="github">GitHub</option>
+                  <option value="spotify">Spotify</option>
+                  <option value="pdf">Local PDF Reader</option>
+                  <option value="tasks">Task Board</option>
+                </select>
+              </div>
+
+              <div class="modal-btn-row" style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+                <button id="modal-save-web-app-btn" class="tactile-btn primary">
+                  <i data-lucide="plus"></i> Add Web App to Workspace
+                </button>
+                <button id="modal-split-web-app-btn" class="tactile-btn accent">
+                  <i data-lucide="columns"></i> + Add &amp; Open in 50/50 Split
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -905,6 +1240,7 @@
 
   <!-- SCRIPTS -->
   <script src="vendor/pdf.min.js"></script>
+  <script src="ai-agent.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

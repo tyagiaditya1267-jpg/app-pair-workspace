@@ -1,7 +1,13 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog, clipboard, session, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
+
+let mammoth = null;
+try { mammoth = require('mammoth'); } catch (e) { console.warn('mammoth load warning:', e.message); }
+
+let docx = null;
+try { docx = require('docx'); } catch (e) { console.warn('docx load warning:', e.message); }
 
 // Standard modern desktop Chrome User-Agent with Electron stripped out
 const CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -430,27 +436,68 @@ function registerLocalAppHandlers() {
     }
   });
 
+  // Helper function to snap an external Windows application to a screen rectangle
+  function positionExternalAppWindow(appPath, targetX, targetY, targetW, targetH) {
+    if (!appPath) return;
+    const baseName = path.basename(appPath, path.extname(appPath)).replace(/[^a-zA-Z0-9_\-\s]/g, '');
+    const psScript = `
+\$code = @"
+using System;
+using System.Runtime.InteropServices;
+public class WinOps {
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+  [DllImport("user32.dll")]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
+Add-Type -TypeDefinition \$code -ErrorAction SilentlyContinue
+
+\$base = "${baseName}"
+for (\$i = 0; \$i -lt 15; \$i++) {
+  Start-Sleep -Milliseconds 300
+  \$proc = Get-Process | Where-Object { \$_.MainWindowHandle -ne [IntPtr]::Zero -and (\$_.ProcessName -like "*\$base*" -or \$_.MainWindowTitle -like "*\$base*") } | Select-Object -First 1
+  if (\$proc) {
+    [WinOps]::ShowWindow(\$proc.MainWindowHandle, 9)
+    [WinOps]::MoveWindow(\$proc.MainWindowHandle, ${targetX}, ${targetY}, ${targetW}, ${targetH}, \$true)
+    [WinOps]::SetForegroundWindow(\$proc.MainWindowHandle)
+    break
+  }
+}
+`;
+    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"').replace(/\r?\n/g, '; ')}"`, (err) => {
+      if (err) console.warn('positionExternalAppWindow notice:', err.message);
+    });
+  }
+
   // 4. Snap window side-by-side on laptop monitor (50/50 hardware snap)
   ipcMain.handle('snap-window-split', async (event, { side, appPath }) => {
     try {
-      if (mainWindow) {
-        const primaryDisplay = screen.getPrimaryDisplay();
-        const { x, y, width, height } = primaryDisplay.workArea;
-        const halfWidth = Math.floor(width / 2);
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { x, y, width, height } = primaryDisplay.workArea;
+      const halfWidth = Math.floor(width / 2);
 
+      let appTargetX = x;
+      let appTargetW = halfWidth;
+
+      if (mainWindow) {
         if (mainWindow.isMaximized()) {
           mainWindow.unmaximize();
         }
 
         // If local app is on the LEFT pane of the workspace,
-        // snap App-Pair Workspace to the RIGHT half of the monitor so the local app can be on the LEFT!
+        // snap App-Pair Workspace to the RIGHT half of the monitor so the local app is on the LEFT!
         if (side === 'left') {
           mainWindow.setBounds({
             x: x + halfWidth,
             y: y,
-            width: halfWidth,
+            width: width - halfWidth,
             height: height
           });
+          appTargetX = x;
+          appTargetW = halfWidth;
         } else {
           // If local app is on the RIGHT pane of the workspace,
           // snap App-Pair Workspace to the LEFT half of the monitor!
@@ -460,17 +507,322 @@ function registerLocalAppHandlers() {
             width: halfWidth,
             height: height
           });
+          appTargetX = x + halfWidth;
+          appTargetW = width - halfWidth;
         }
       }
 
       if (appPath) {
-        await shell.openPath(appPath);
+        await shell.openPath(appPath).catch(() => {
+          exec(`"${appPath}"`);
+        });
+        positionExternalAppWindow(appPath, appTargetX, y, appTargetW, height);
       }
 
       return { success: true };
     } catch (err) {
       console.error('snap-window-split error:', err);
       return { success: false, error: err.message };
+    }
+  });
+
+  // 5. True 50/50 Native App Half-Window Snapper (Feature 2)
+  ipcMain.handle('snap-native-app-half-window', async (event, { appPath, side = 'left' }) => {
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { x, y, width, height } = primaryDisplay.workArea;
+      const halfWidth = Math.floor(width / 2);
+
+      // App-Pair Workspace snaps to the opposite side of the native app
+      const workspaceX = side === 'left' ? x + halfWidth : x;
+      const workspaceW = side === 'left' ? width - halfWidth : halfWidth;
+
+      const nativeX = side === 'left' ? x : x + halfWidth;
+      const nativeW = side === 'left' ? halfWidth : width - halfWidth;
+
+      if (mainWindow) {
+        if (mainWindow.isMaximized()) {
+          mainWindow.unmaximize();
+        }
+        mainWindow.setBounds({
+          x: workspaceX,
+          y: y,
+          width: workspaceW,
+          height: height
+        });
+      }
+
+      if (appPath) {
+        await shell.openPath(appPath).catch(() => {
+          exec(`"${appPath}"`);
+        });
+        positionExternalAppWindow(appPath, nativeX, y, nativeW, height);
+      }
+
+      return { success: true, nativeBounds: { x: nativeX, y, width: nativeW, height } };
+    } catch (err) {
+      console.error('snap-native-app-half-window error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+}
+
+// ========================================
+// IPC HANDLERS — IN-APP WORD DOCUMENT STUDIO (Feature 6)
+// ========================================
+
+function registerWordHandlers() {
+  const docsDir = path.join(app.getPath('userData'), 'saved_word_docs');
+  if (!fs.existsSync(docsDir)) {
+    try { fs.mkdirSync(docsDir, { recursive: true }); } catch (e) {}
+  }
+
+  // 1. Pick real .docx / .doc / .rtf file from laptop and convert to clean HTML
+  ipcMain.handle('word:pickFile', async () => {
+    try {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Open Word Document (.docx, .doc, .rtf)',
+        filters: [
+          { name: 'Word Documents', extensions: ['docx', 'doc', 'rtf', 'txt', 'md'] },
+          { name: 'All Files', extensions: ['*'] }
+        ],
+        properties: ['openFile']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true };
+      }
+
+      const filePath = result.filePaths[0];
+      const ext = path.extname(filePath).toLowerCase();
+      const title = path.basename(filePath, ext);
+      let html = '';
+      let rawText = '';
+
+      if (ext === '.docx' && mammoth) {
+        const fileBuffer = fs.readFileSync(filePath);
+        const conversion = await mammoth.convertToHtml({ buffer: fileBuffer });
+        html = conversion.value || '<p></p>';
+        rawText = (await mammoth.extractRawText({ buffer: fileBuffer })).value || '';
+      } else {
+        rawText = fs.readFileSync(filePath, 'utf8');
+        html = rawText.split(/\r?\n\r?\n/).map(p => `<p>${p.replace(/\r?\n/g, '<br>')}</p>`).join('');
+      }
+
+      return {
+        success: true,
+        filePath,
+        title,
+        html,
+        rawText,
+        wordCount: rawText ? rawText.trim().split(/\s+/).length : 0
+      };
+    } catch (err) {
+      console.error('word:pickFile error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // 2. Save document inside App Workspace (userData/saved_word_docs/)
+  ipcMain.handle('word:saveDocWorkspace', async (event, docData) => {
+    try {
+      if (!docData || !docData.id) {
+        docData = Object.assign({ id: 'doc_' + Date.now() }, docData);
+      }
+      const safeId = String(docData.id).replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const docFile = path.join(docsDir, `${safeId}.json`);
+      const payload = {
+        id: docData.id,
+        title: docData.title || 'Untitled Document',
+        html: docData.html || '',
+        plainText: docData.plainText || '',
+        wordCount: docData.wordCount || 0,
+        filePath: docData.filePath || null,
+        lastEdited: new Date().toISOString(),
+        createdAt: docData.createdAt || new Date().toISOString()
+      };
+      fs.writeFileSync(docFile, JSON.stringify(payload, null, 2), 'utf8');
+      return { success: true, doc: payload };
+    } catch (err) {
+      console.error('word:saveDocWorkspace error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // 3. Get all saved Word Documents for shelf / workspace resume
+  ipcMain.handle('word:getSavedDocs', async () => {
+    try {
+      if (!fs.existsSync(docsDir)) return { success: true, docs: [] };
+      const files = fs.readdirSync(docsDir).filter(f => f.endsWith('.json'));
+      const docs = [];
+      for (const f of files) {
+        try {
+          const raw = fs.readFileSync(path.join(docsDir, f), 'utf8');
+          docs.push(JSON.parse(raw));
+        } catch (e) {}
+      }
+      docs.sort((a, b) => new Date(b.lastEdited || 0) - new Date(a.lastEdited || 0));
+      return { success: true, docs };
+    } catch (err) {
+      console.error('word:getSavedDocs error:', err);
+      return { success: false, error: err.message, docs: [] };
+    }
+  });
+
+  // 4. Delete saved Word Document
+  ipcMain.handle('word:deleteSavedDoc', async (event, id) => {
+    try {
+      const safeId = String(id).replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const docFile = path.join(docsDir, `${safeId}.json`);
+      if (fs.existsSync(docFile)) {
+        fs.unlinkSync(docFile);
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('word:deleteSavedDoc error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // 5. Export back to real .docx file on laptop
+  ipcMain.handle('word:exportDocx', async (event, { title, plainText, html, suggestedPath }) => {
+    try {
+      const defaultName = (title || 'Document').replace(/[^a-zA-Z0-9_\-\s]/g, '') + '.docx';
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export Document to .docx',
+        defaultPath: suggestedPath || path.join(app.getPath('documents'), defaultName),
+        filters: [
+          { name: 'Word Document (*.docx)', extensions: ['docx'] }
+        ]
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { canceled: true };
+      }
+
+      const outPath = result.filePath;
+
+      if (docx) {
+        const lines = (plainText || '').split(/\r?\n/);
+        const docxParagraphs = lines.map(line => {
+          if (!line.trim()) {
+            return new docx.Paragraph({ text: '' });
+          }
+          if (line.startsWith('# ')) {
+            return new docx.Paragraph({
+              text: line.replace(/^#\s+/, ''),
+              heading: docx.HeadingLevel.HEADING_1
+            });
+          }
+          if (line.startsWith('## ')) {
+            return new docx.Paragraph({
+              text: line.replace(/^##\s+/, ''),
+              heading: docx.HeadingLevel.HEADING_2
+            });
+          }
+          return new docx.Paragraph({
+            children: [new docx.TextRun(line)]
+          });
+        });
+
+        const doc = new docx.Document({
+          sections: [{
+            properties: {},
+            children: docxParagraphs.length > 0 ? docxParagraphs : [new docx.Paragraph({ text: title || 'Document' })]
+          }]
+        });
+
+        const buffer = await docx.Packer.toBuffer(doc);
+        fs.writeFileSync(outPath, buffer);
+      } else {
+        // Fallback: write text/html or RTF content
+        fs.writeFileSync(outPath, plainText || html || '', 'utf8');
+      }
+
+      return { success: true, filePath: outPath };
+    } catch (err) {
+      console.error('word:exportDocx error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+}
+
+// ========================================
+// IPC HANDLERS — COMMON PALETTE EXTERNAL PASTE (Feature 4)
+// ========================================
+
+function registerExternalPasteHandlers() {
+  ipcMain.handle('paste-to-external-app', async (event, { target, text }) => {
+    try {
+      const cleanText = text || '';
+      clipboard.writeText(cleanText);
+
+      if (target === 'notepad') {
+        const tempPath = path.join(app.getPath('temp'), 'palette-transfer.txt');
+        fs.writeFileSync(tempPath, cleanText, 'utf8');
+        exec(`notepad.exe "${tempPath}"`, (err) => {
+          if (err) console.warn('notepad open notice:', err.message);
+        });
+        return { success: true, target: 'notepad', filePath: tempPath };
+      }
+
+      if (target === 'word') {
+        // Automate Microsoft Word via COM or temp RTF file
+        const tempRtf = path.join(app.getPath('temp'), 'palette-transfer.rtf');
+        const rtfEscaped = cleanText
+          .replace(/\\/g, '\\\\')
+          .replace(/{/g, '\\{')
+          .replace(/}/g, '\\}')
+          .replace(/\r?\n/g, '\\par\n');
+        const rtfContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Calibri;}} \\f0\\fs24 ${rtfEscaped}}`;
+        fs.writeFileSync(tempRtf, rtfContent, 'utf8');
+
+        const escapedText = cleanText.replace(/'/g, "''").replace(/\r?\n/g, ' ');
+        const psWord = `try { \$word = New-Object -ComObject Word.Application; \$word.Visible = \$true; \$doc = \$word.Documents.Add(); \$word.Selection.TypeText('${escapedText}'); \$word.Activate() } catch { Start-Process 'winword.exe' '${tempRtf.replace(/\\/g, '\\\\')}' }`;
+        exec(`powershell -NoProfile -Command "${psWord}"`, (err) => {
+          if (err) {
+            // Fallback: open temp RTF with default application (Word / WordPad)
+            shell.openPath(tempRtf);
+          }
+        });
+        return { success: true, target: 'word' };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('paste-to-external-app error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+}
+
+// ========================================
+// IPC HANDLERS — USAGE & SCREEN TIME ANALYTICS (Feature 3)
+// ========================================
+
+function registerUsageHandlers() {
+  const usageFile = path.join(app.getPath('userData'), 'usage-history.json');
+
+  ipcMain.handle('usage:saveAnalytics', async (event, data) => {
+    try {
+      fs.writeFileSync(usageFile, JSON.stringify(data, null, 2), 'utf8');
+      return { success: true };
+    } catch (err) {
+      console.error('usage:saveAnalytics error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('usage:getAnalytics', async () => {
+    try {
+      if (fs.existsSync(usageFile)) {
+        const raw = fs.readFileSync(usageFile, 'utf8');
+        return { success: true, data: JSON.parse(raw) };
+      }
+      return { success: true, data: null };
+    } catch (err) {
+      console.error('usage:getAnalytics error:', err);
+      return { success: false, error: err.message, data: null };
     }
   });
 }
@@ -550,6 +902,9 @@ app.whenReady().then(async () => {
   registerDataHandlers();
   registerSystemHandlers();
   registerLocalAppHandlers();
+  registerWordHandlers();
+  registerExternalPasteHandlers();
+  registerUsageHandlers();
 
   // Set the app to open automatically when the computer/laptop boots up
   try {

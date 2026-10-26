@@ -161,7 +161,45 @@ When asked to perform an action, clearly state what you are doing and produce th
     }
 
     // ========================================================
-    // 3. OPEN APP / WEBSITE (FUZZY MATCHING WITH SYNONYMS)
+    // 3. DUAL-APP SPLIT VIEW LAUNCHER (Feature 1)
+    // ========================================================
+    // Matches: "open Google and Notes", "launch Spotify with Notion", "pair VS Code with ChatGPT in 70/30", "open https://leetcode.com and Idea Notes", etc.
+    const pairMatch = p.match(/^(?:please\s+)?(?:open|launch|start|pair|split|run|set up)\s+(.+?)\s+(?:and|with|\+|alongside|\&)\s+(.+)$/i);
+    if (pairMatch) {
+      let rawPartA = pairMatch[1].trim();
+      let rawPartB = pairMatch[2].trim();
+
+      // Check if this was a search query instead (e.g. "open youtube and search lofi")
+      const isSearchIntent = rawPartB.match(/^(?:search|find|play|look for)\b/i);
+      if (!isSearchIntent) {
+        let ratio = 50;
+        const ratioMatch = rawPartB.match(/\s+(?:in|at|with)\s+(\d{1,2})\/(\d{1,2})/i) || p.match(/\b(30\/70|70\/30|50\/50|60\/40|40\/60|80\/20|20\/80)\b/);
+        if (ratioMatch) {
+          ratio = parseInt(ratioMatch[1].split('/')[0], 10);
+          rawPartB = rawPartB.replace(/\s+(?:in|at|with)\s+\d{1,2}\/\d{1,2}/i, '').trim();
+        }
+
+        const appA = this._resolveAppEntity(rawPartA);
+        const appB = this._resolveAppEntity(rawPartB);
+
+        return {
+          confidence: 0.99,
+          response: `⚡ Launching **${appA.name}** + **${appB.name}** in ${ratio}/${100 - ratio} Split View...`,
+          actions: [
+            {
+              type: 'LAUNCH_SPLIT_PAIR',
+              appA,
+              appB,
+              ratio,
+              isNativeSnap: !!(appA.isNative || appB.isNative)
+            }
+          ]
+        };
+      }
+    }
+
+    // ========================================================
+    // 4. OPEN APP / WEBSITE (FUZZY MATCHING WITH SYNONYMS)
     // ========================================================
     
     // Patterns: "open my gmail account", "open gmail", "go to my playlist", "launch chatgpt", "open notepad"
@@ -372,6 +410,58 @@ When asked to perform an action, clearly state what you are doing and produce th
     return null;
   }
 
+  _resolveAppEntity(raw) {
+    if (!raw) return { type: 'notes', name: 'Idea Notes', icon: 'book-open' };
+    const clean = raw.trim().replace(/^["']|["']$/g, '');
+    const lower = clean.toLowerCase();
+
+    // Raw URLs & domain shorthands
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      const hostname = clean.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      return { type: 'custom-web', name: hostname, url: clean, icon: 'globe' };
+    }
+    if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(clean) || lower.startsWith('localhost:')) {
+      const url = lower.startsWith('localhost:') ? 'http://' + clean : 'https://' + clean;
+      return { type: 'custom-web', name: clean.split('/')[0], url, icon: 'globe' };
+    }
+
+    // Built-in Workspace Tools
+    if (lower.includes('google') || lower === 'search') return { type: 'google', name: 'Google Search', url: 'https://www.google.com', icon: 'globe' };
+    if (lower.includes('spotify') || lower.includes('music') || lower.includes('playlist')) return { type: 'spotify', name: 'Spotify', url: 'https://open.spotify.com', icon: 'music' };
+    if (lower.includes('github') || lower.includes('repo')) return { type: 'github', name: 'GitHub', url: 'https://github.com', icon: 'github' };
+    if (lower.includes('chatgpt') || lower.includes('gpt') || lower.includes('openai')) return { type: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com', icon: 'message-square' };
+    if (lower.includes('notion')) return { type: 'notion', name: 'Notion', url: 'https://www.notion.so', icon: 'file-text' };
+    if (lower.includes('pdf') || lower.includes('contract')) return { type: 'pdf', name: 'Local PDF Reader', icon: 'file-check' };
+    if (lower.includes('note') || lower.includes('notebook')) return { type: 'notes', name: 'Idea Notes', icon: 'book-open' };
+    if (lower.includes('task') || lower.includes('kanban') || lower.includes('sprint') || lower.includes('board')) return { type: 'tasks', name: 'Task Board', icon: 'check-square' };
+    if (lower.includes('word') || lower.includes('docx') || lower.includes('doc')) return { type: 'word', name: 'Word Document Studio', icon: 'file-edit' };
+
+    // Standard Windows Desktop Native Apps
+    if (lower.includes('notepad')) return { type: 'local-app', name: 'Notepad', exec: 'notepad.exe', path: 'notepad.exe', isNative: true, icon: 'file-text' };
+    if (lower.includes('calc')) return { type: 'local-app', name: 'Calculator', exec: 'calc.exe', path: 'calc.exe', isNative: true, icon: 'hash' };
+    if (lower.includes('code') || lower.includes('vs code') || lower.includes('vscode')) return { type: 'local-app', name: 'VS Code', exec: 'code.cmd', path: 'code.cmd', isNative: true, icon: 'code' };
+    if (lower.includes('paint') || lower.includes('mspaint')) return { type: 'local-app', name: 'Paint', exec: 'mspaint.exe', path: 'mspaint.exe', isNative: true, icon: 'image' };
+    if (lower.includes('terminal') || lower.includes('cmd') || lower.includes('command prompt')) return { type: 'local-app', name: 'Command Prompt', exec: 'cmd.exe', path: 'cmd.exe', isNative: true, icon: 'terminal' };
+
+    // Check custom saved laptop apps in localStorage
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const custom = JSON.parse(localStorage.getItem('app_pair_custom_apps') || '[]');
+        const found = custom.find(c => c.name && (c.name.toLowerCase().includes(lower) || lower.includes(c.name.toLowerCase())));
+        if (found) {
+          if (found.type === 'local') {
+            return { type: 'local-app', name: found.name, path: found.path, isNative: true, icon: found.icon || 'laptop' };
+          } else {
+            return { type: 'custom-web', name: found.name, url: found.url, icon: found.icon || 'globe' };
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Default to search or webview
+    return { type: 'google', name: clean, url: 'https://www.google.com/search?q=' + encodeURIComponent(clean), icon: 'globe' };
+  }
+
   _buildSearchAction(engine, query) {
     if (!query) query = 'trending';
     const isYT = engine.toLowerCase().includes('youtube') || engine.toLowerCase().includes('yt');
@@ -439,6 +529,16 @@ What would you like me to do?`,
         let detail = '';
 
         switch (action.type) {
+          case 'LAUNCH_SPLIT_PAIR':
+            if (this.workspace && this.workspace.launchSplitPair) {
+              await this.workspace.launchSplitPair(action.appA, action.appB, action.ratio);
+              detail = `Launched ${action.appA.name} and ${action.appB.name} in Split View (${action.ratio}/${100 - action.ratio})`;
+            } else if (typeof window !== 'undefined' && typeof window.launchCustomSplitPair === 'function') {
+              await window.launchCustomSplitPair(action.appA, action.appB, action.ratio);
+              detail = `Launched ${action.appA.name} and ${action.appB.name} in Split View`;
+            }
+            break;
+
           case 'OPEN_APP':
             if (this.workspace.openApp) {
               this.workspace.openApp(action.app);
@@ -618,6 +718,9 @@ What would you like me to do?`,
   }
 }
 
+if (typeof window !== 'undefined') {
+  window.AIAgent = AIAgent;
+}
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = AIAgent;
 }

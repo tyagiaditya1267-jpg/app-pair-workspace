@@ -70,7 +70,37 @@ contextBridge.exposeInMainWorld('api', {
     pickLocalApp: () => ipcRenderer.invoke('pick-local-app'),
     scanInstalledApps: () => ipcRenderer.invoke('scan-installed-apps'),
     launchApp: (appPath) => ipcRenderer.invoke('launch-local-app', appPath),
-    snapWindowSplit: (side, appPath) => ipcRenderer.invoke('snap-window-split', { side, appPath })
+    snapWindowSplit: (side, appPath) => ipcRenderer.invoke('snap-window-split', { side, appPath }),
+    snapNativeAppHalfWindow: (options) => ipcRenderer.invoke('snap-native-app-half-window', options)
+  },
+
+  // ========================================
+  // IN-APP WORD DOCUMENT STUDIO (Feature 6)
+  // ========================================
+
+  word: {
+    pickFile: () => ipcRenderer.invoke('word:pickFile'),
+    saveDocWorkspace: (docData) => ipcRenderer.invoke('word:saveDocWorkspace', docData),
+    getSavedDocs: () => ipcRenderer.invoke('word:getSavedDocs'),
+    deleteSavedDoc: (id) => ipcRenderer.invoke('word:deleteSavedDoc', id),
+    exportDocx: (options) => ipcRenderer.invoke('word:exportDocx', options)
+  },
+
+  // ========================================
+  // EXTERNAL APP INTEGRATION (Features 2 & 4)
+  // ========================================
+
+  external: {
+    pasteToExternalApp: (target, text) => ipcRenderer.invoke('paste-to-external-app', { target, text })
+  },
+
+  // ========================================
+  // USAGE & SCREEN TIME ANALYTICS (Feature 3)
+  // ========================================
+
+  usage: {
+    saveAnalytics: (data) => ipcRenderer.invoke('usage:saveAnalytics', data),
+    getAnalytics: () => ipcRenderer.invoke('usage:getAnalytics')
   },
 
   // ========================================

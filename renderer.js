@@ -20,7 +20,7 @@ const appState = {
   splitRatio: 50, // percentage for left pane
   panes: {
     left: {
-      type: 'google', // 'google' | 'spotify' | 'github' | 'chatgpt' | 'notion' | 'pdf' | 'notes' | 'tasks' | 'local-app' | 'custom'
+      type: 'google', // 'google' | 'spotify' | 'github' | 'chatgpt' | 'notion' | 'pdf' | 'notes' | 'tasks' | 'local-app' | 'custom' | 'word'
       url: 'https://www.google.com',
       filePath: null,
       title: 'Google',
@@ -65,7 +65,30 @@ Welcome to your offline Notion-style documents workspace. Write specifications, 
     'const app = require("electron");',
     '# Sprint Checklist\n- [ ] Compare Contract Drafts\n- [ ] Export Architecture diagram'
   ],
-  swatches: ['#D94E1F', '#1E3A2F', '#1C1917', '#2563EB', '#F4F1EA']
+  swatches: ['#D94E1F', '#1E3A2F', '#1C1917', '#2563EB', '#F4F1EA'],
+  // Telemetry & Screen Time (Feature 3)
+  usage: {
+    todaySeconds: 0,
+    cumulativeSeconds: {},
+    pairSeconds: {},
+    sessions: [],
+    sessionStart: Date.now()
+  },
+  // In-App Word Document Studio (Feature 6)
+  wordDoc: {
+    id: 'doc_default',
+    title: 'Specification Notes.docx',
+    html: '',
+    plainText: '',
+    wordCount: 0,
+    charCount: 0,
+    filePath: null,
+    lastEdited: null
+  },
+  savedWordDocs: [],
+  // Palette Auto-Sync (Feature 4)
+  paletteAutoSync: false,
+  paletteSyncTarget: 'notes'
 };
 
 // URL Mappings for Real Services
@@ -141,6 +164,9 @@ function initStorage() {
       if (parsed.swatches && parsed.swatches.length > 0) appState.swatches = parsed.swatches;
       if (parsed.recentPdfs) appState.recentPdfs = parsed.recentPdfs;
       if (parsed.customApps && Array.isArray(parsed.customApps)) appState.customApps = parsed.customApps;
+      if (parsed.paletteAutoSync !== undefined) appState.paletteAutoSync = parsed.paletteAutoSync;
+      if (parsed.paletteSyncTarget) appState.paletteSyncTarget = parsed.paletteSyncTarget;
+      if (parsed.wordDoc) appState.wordDoc = Object.assign({}, appState.wordDoc, parsed.wordDoc);
     }
   } catch (err) {
     console.warn('Could not read state from localStorage:', err);
@@ -156,7 +182,10 @@ function persistStorage() {
       snippets: appState.snippets,
       swatches: appState.swatches,
       recentPdfs: appState.recentPdfs,
-      customApps: appState.customApps
+      customApps: appState.customApps,
+      paletteAutoSync: appState.paletteAutoSync,
+      paletteSyncTarget: appState.paletteSyncTarget,
+      wordDoc: appState.wordDoc
     }));
   } catch (err) {
     console.warn('Could not save state:', err);
@@ -178,7 +207,7 @@ function showToast(text) {
 }
 
 // DOM Elements
-let hubView, splitView;
+let hubView, splitView, usageView, wordDocView;
 let paneLeft, paneRight, splitResizer;
 let leftContentView, rightContentView;
 let leftUrlInput, rightUrlInput;
@@ -203,6 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAddAppModal();
   setupCustomPairBuilder();
   renderCustomApps();
+  initUsageAnalytics();
+  setupPaletteBridge();
+  setupWordStudio();
+  setupInstantUrlOpening();
   
   if (window.lucide) {
     window.lucide.createIcons();
@@ -212,6 +245,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function cacheDOMElements() {
   hubView = document.getElementById('hub-view');
   splitView = document.getElementById('split-view');
+  usageView = document.getElementById('usage-history-view');
+  wordDocView = document.getElementById('word-doc-view');
   paneLeft = document.getElementById('pane-left');
   paneRight = document.getElementById('pane-right');
   splitResizer = document.getElementById('split-resizer');
@@ -290,25 +325,58 @@ function bindNavigation() {
   document.getElementById('side-pdf-btn').addEventListener('click', () => launchSingleApp('pdf'));
   document.getElementById('side-notes-btn').addEventListener('click', () => launchSingleApp('notes'));
   document.getElementById('side-tasks-btn').addEventListener('click', () => launchSingleApp('tasks'));
+  
+  const sideWordBtn = document.getElementById('side-word-btn');
+  if (sideWordBtn) sideWordBtn.addEventListener('click', () => switchView('word-doc'));
+
+  const sideHistoryBtn = document.getElementById('side-history-btn');
+  if (sideHistoryBtn) sideHistoryBtn.addEventListener('click', () => switchView('usage'));
+
+  const hubViewAnalyticsBtn = document.getElementById('hub-view-analytics-btn');
+  if (hubViewAnalyticsBtn) hubViewAnalyticsBtn.addEventListener('click', () => switchView('usage'));
+
+  const usageBackHubBtn = document.getElementById('usage-back-hub-btn');
+  if (usageBackHubBtn) usageBackHubBtn.addEventListener('click', () => switchView('hub'));
+
+  const wordBackHubBtn = document.getElementById('word-back-hub-btn');
+  if (wordBackHubBtn) wordBackHubBtn.addEventListener('click', () => switchView('hub'));
+
   document.getElementById('side-palette-toggle-btn').addEventListener('click', togglePaletteDrawer);
   document.getElementById('side-assistant-toggle-btn').addEventListener('click', toggleAssistantDrawer);
 }
 
 function switchView(viewName) {
   appState.currentView = viewName;
+  const allViews = [hubView, splitView, usageView, wordDocView].filter(Boolean);
+  allViews.forEach(v => v.classList.add('hidden'));
+
+  const navLauncher = document.getElementById('nav-launcher-btn');
+  const navSplit = document.getElementById('nav-split-btn');
+  const sideHub = document.getElementById('side-hub-btn');
+  const sideWord = document.getElementById('side-word-btn');
+  const sideHistory = document.getElementById('side-history-btn');
+
+  [navLauncher, navSplit, sideHub, sideWord, sideHistory].forEach(btn => {
+    if (btn) btn.classList.remove('active');
+  });
+
   if (viewName === 'hub') {
-    hubView.classList.remove('hidden');
-    splitView.classList.add('hidden');
-    document.getElementById('nav-launcher-btn').classList.add('active');
-    document.getElementById('nav-split-btn').classList.remove('active');
-    document.getElementById('side-hub-btn').classList.add('active');
-  } else {
-    hubView.classList.add('hidden');
-    splitView.classList.remove('hidden');
-    document.getElementById('nav-launcher-btn').classList.remove('active');
-    document.getElementById('nav-split-btn').classList.add('active');
-    document.getElementById('side-hub-btn').classList.remove('active');
+    if (hubView) hubView.classList.remove('hidden');
+    if (navLauncher) navLauncher.classList.add('active');
+    if (sideHub) sideHub.classList.add('active');
+    updateHubScreenTimeStrip();
+    renderWordSavedDocsShelf();
+  } else if (viewName === 'split') {
+    if (splitView) splitView.classList.remove('hidden');
+    if (navSplit) navSplit.classList.add('active');
     renderSplitPanes();
+  } else if (viewName === 'usage') {
+    if (usageView) usageView.classList.remove('hidden');
+    if (sideHistory) sideHistory.classList.add('active');
+    renderUsageAnalytics();
+  } else if (viewName === 'word-doc') {
+    if (wordDocView) wordDocView.classList.remove('hidden');
+    if (sideWord) sideWord.classList.add('active');
   }
 }
 
@@ -429,6 +497,7 @@ function launchPair(pairId) {
 
   document.getElementById('current-pair-title').innerText = config.title;
   switchView('split');
+  logSession(config.left.title, config.right.title, 50);
   showToast(`Launched ${config.title}`);
 }
 
@@ -436,6 +505,14 @@ function launchPair(pairId) {
 function launchSingleApp(appType) {
   if (appType === 'palette') {
     togglePaletteDrawer();
+    return;
+  }
+  if (appType === 'word') {
+    switchView('word-doc');
+    return;
+  }
+  if (appType === 'history') {
+    switchView('usage');
     return;
   }
   if (appType === 'notes') {
@@ -449,6 +526,7 @@ function launchSingleApp(appType) {
       loadPdfInPane('left', pdfData);
       appState.panes.right = { type: 'notes', title: 'Idea Notes' };
       switchView('split');
+      logSession('Local PDF Reader', 'Idea Notes', 50);
     });
     return;
   } else if (appType === 'notion') {
@@ -462,28 +540,70 @@ function launchSingleApp(appType) {
 
   document.getElementById('current-pair-title').innerText = `${appType.toUpperCase()} Workspace`;
   switchView('split');
+  logSession(appState.panes.left.title, appState.panes.right.title, 50);
+}
+
+// URL Detection & Formatting Helper (Feature 5)
+function detectAndFormatUrl(raw) {
+  if (!raw) return null;
+  const str = raw.trim();
+  if (/^https?:\/\//i.test(str)) return str;
+  if (/^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?(\/.*)?$/i.test(str)) {
+    return 'http://' + str;
+  }
+  if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(:\d+)?(\/.*)?$/i.test(str) || /^www\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(str)) {
+    return 'https://' + str;
+  }
+  return null;
+}
+
+function setupInstantUrlOpening() {
+  const hubSearch = document.getElementById('hub-search-input');
+  const topSearch = document.getElementById('top-search-input');
+
+  const bindInstant = (inp) => {
+    if (!inp) return;
+    inp.addEventListener('paste', () => {
+      setTimeout(() => {
+        const text = inp.value.trim();
+        const url = detectAndFormatUrl(text);
+        if (url) {
+          handleUniversalLaunch(url);
+        }
+      }, 50);
+    });
+  };
+
+  bindInstant(hubSearch);
+  bindInstant(topSearch);
 }
 
 // Universal URL & Search Launcher
 function handleUniversalLaunch(input) {
-  let url = input.trim();
-  if (!url) return;
+  let text = input.trim();
+  if (!text) return;
 
-  // Check if it's a URL
-  if (/^https?:\/\//i.test(url) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(url)) {
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-    appState.panes.left = { type: 'custom', url, title: new URL(url).hostname };
+  const formattedUrl = detectAndFormatUrl(text);
+  if (formattedUrl) {
+    try {
+      const u = new URL(formattedUrl);
+      appState.panes.left = { type: 'custom', url: formattedUrl, title: u.hostname || 'Web App' };
+    } catch (e) {
+      appState.panes.left = { type: 'custom', url: formattedUrl, title: 'Web App' };
+    }
     appState.panes.right = { type: 'notes', title: 'Idea Notes' };
+    logSession(appState.panes.left.title, 'Idea Notes', 50);
   } else {
     // Google search
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
-    appState.panes.left = { type: 'google', url: searchUrl, title: `Search: ${url}` };
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(text)}`;
+    appState.panes.left = { type: 'google', url: searchUrl, title: `Search: ${text}` };
     appState.panes.right = { type: 'notes', title: 'Idea Notes' };
+    logSession(`Search: ${text}`, 'Idea Notes', 50);
   }
 
   document.getElementById('current-pair-title').innerText = 'Web Studio';
   switchView('split');
-  showToast(`Navigating to ${url}`);
+  showToast(`Navigating to ${formattedUrl || text}`);
 }
 
 // ==========================================================================
@@ -598,7 +718,43 @@ function handlePaneSelectChange(side, appType) {
 }
 
 function resolvePaneFromChoice(side, val) {
-  if (val.startsWith('custom_')) {
+  if (!val) return;
+
+  // 1. Support Entity Objects (e.g. from AIAgent, Custom Pair Builder, or Add Modal)
+  if (typeof val === 'object') {
+    if (val.isNative || val.isLocal || val.type === 'local' || val.type === 'local-app' || val.path) {
+      appState.panes[side] = {
+        type: 'local-app',
+        name: val.name,
+        path: val.path,
+        icon: val.icon || null,
+        title: val.name
+      };
+    } else if (val.type === 'word') {
+      appState.panes[side] = { type: 'word', title: 'Word Document Studio' };
+    } else if (val.type === 'pdf') {
+      appState.panes[side] = { type: 'pdf', title: val.title || 'Local PDF Reader', filePath: val.filePath || 'sample1.pdf' };
+    } else if (val.type === 'notes') {
+      appState.panes[side] = { type: 'notes', title: 'Idea Notes' };
+    } else if (val.type === 'tasks') {
+      appState.panes[side] = { type: 'tasks', title: 'Task Board' };
+    } else if (val.type === 'notion') {
+      appState.panes[side] = { type: 'notion', url: URL_MAP.notion, title: 'Notion', notionOffline: false };
+    } else if (val.type === 'custom' || val.type === 'web' || val.url) {
+      appState.panes[side] = {
+        type: 'custom',
+        url: val.url,
+        title: val.name || val.title || 'Web App'
+      };
+    } else {
+      const u = val.url || URL_MAP[val.type || val.id] || 'https://www.google.com';
+      appState.panes[side] = { type: val.type || val.id || 'google', url: u, title: val.name || val.title || 'Google' };
+    }
+    return;
+  }
+
+  // 2. String Choices
+  if (typeof val === 'string' && val.startsWith('custom_')) {
     const appId = val.replace('custom_', '');
     const app = appState.customApps.find(a => a.id === appId);
     if (app) {
@@ -626,11 +782,34 @@ function resolvePaneFromChoice(side, val) {
     appState.panes[side] = { type: 'pdf', title: 'Local PDF Reader', filePath: 'sample1.pdf' };
   } else if (val === 'notes') {
     appState.panes[side] = { type: 'notes', title: 'Idea Notes' };
+  } else if (val === 'word') {
+    appState.panes[side] = { type: 'word', title: 'Word Document Studio' };
   } else if (val === 'tasks') {
     appState.panes[side] = { type: 'tasks', title: 'Task Board' };
   } else if (val === 'notion') {
     appState.panes[side] = { type: 'notion', url: URL_MAP.notion, title: 'Notion', notionOffline: false };
   } else {
+    // Check if matching custom app by name
+    const customMatch = appState.customApps.find(a => a.name.toLowerCase() === val.toLowerCase());
+    if (customMatch) {
+      if (customMatch.type === 'local') {
+        appState.panes[side] = {
+          type: 'local-app',
+          name: customMatch.name,
+          path: customMatch.path,
+          icon: customMatch.icon,
+          title: customMatch.name
+        };
+      } else {
+        appState.panes[side] = {
+          type: 'custom',
+          url: customMatch.url,
+          title: customMatch.name
+        };
+      }
+      return;
+    }
+
     const url = URL_MAP[val] || 'https://www.google.com';
     appState.panes[side] = { type: val, url, title: val.toUpperCase() };
   }
@@ -931,6 +1110,15 @@ async function renderPane(side) {
         showToast('Task Added');
       }
     });
+  }
+
+  // ----------------------------------------------------
+  // MODE 7: IN-APP WORD DOCUMENT STUDIO (Inline Split Mode)
+  // ----------------------------------------------------
+  else if (paneConfig.type === 'word') {
+    browseBtn.style.display = 'none';
+    urlInput.style.display = 'none';
+    renderWordEditorComponent(side, container);
   }
 }
 
@@ -1646,6 +1834,33 @@ function setupAddAppModal() {
     showToast(`Added ${name} to Workspace`);
   });
 
+  // Save & Open in 50/50 Split (Feature 2)
+  const splitPickedBtn = document.getElementById('modal-split-picked-app-btn');
+  if (splitPickedBtn) {
+    splitPickedBtn.addEventListener('click', () => {
+      if (!currentPickedApp) return;
+      const name = document.getElementById('picked-app-name').value.trim() || currentPickedApp.name;
+      const cat = document.getElementById('picked-app-category').value;
+      const companion = document.getElementById('picked-app-companion-select')?.value || 'notes';
+
+      const newApp = {
+        id: 'app_' + Date.now(),
+        name,
+        type: 'local',
+        path: currentPickedApp.path,
+        icon: currentPickedApp.icon || null,
+        category: cat
+      };
+
+      appState.customApps.push(newApp);
+      persistStorage();
+      renderCustomApps();
+      closeModal();
+
+      window.launchCustomSplitPair(newApp, companion, 50);
+    });
+  }
+
   // 2. Scan & Render Installed Laptop Apps
   async function scanAndRenderInstalledApps() {
     const listEl = document.getElementById('detected-apps-list');
@@ -1688,7 +1903,10 @@ function setupAddAppModal() {
             <span class="detected-item-path" title="${escapeHtml(appItem.path)}">${escapeHtml(appItem.path)}</span>
           </div>
         </div>
-        <button class="add-detected-btn">+ Add</button>
+        <div class="detected-actions" style="display:flex; gap:6px;">
+          <button class="add-detected-btn">+ Add</button>
+          <button class="split-detected-btn" title="Add and open in 50/50 Split View">+ 50/50 Split</button>
+        </div>
       `;
 
       itemEl.querySelector('.add-detected-btn').addEventListener('click', () => {
@@ -1705,6 +1923,24 @@ function setupAddAppModal() {
         renderCustomApps();
         closeModal();
         showToast(`Added ${appItem.name} to Workspace`);
+      });
+
+      itemEl.querySelector('.split-detected-btn').addEventListener('click', () => {
+        const newApp = {
+          id: 'app_' + Date.now() + Math.random().toString(36).substr(2, 4),
+          name: appItem.name,
+          type: 'local',
+          path: appItem.path,
+          icon: appItem.icon || null,
+          category: 'Productivity'
+        };
+        appState.customApps.push(newApp);
+        persistStorage();
+        renderCustomApps();
+        closeModal();
+
+        const companion = document.getElementById('picked-app-companion-select')?.value || 'notes';
+        window.launchCustomSplitPair(newApp, companion, 50);
       });
 
       listEl.appendChild(itemEl);
@@ -1761,6 +1997,47 @@ function setupAddAppModal() {
     closeModal();
     showToast(`Added ${name} to Workspace`);
   });
+
+  // Save Web App & Open in 50/50 Split (Feature 2)
+  const splitWebBtn = document.getElementById('modal-split-web-app-btn');
+  if (splitWebBtn) {
+    splitWebBtn.addEventListener('click', () => {
+      const nameInp = document.getElementById('web-app-name-input');
+      const urlInp = document.getElementById('web-app-url-input');
+      const catInp = document.getElementById('web-app-category-input');
+      const companion = document.getElementById('web-app-companion-select')?.value || 'notes';
+
+      let name = nameInp.value.trim();
+      let url = urlInp.value.trim();
+      if (!url) {
+        alert('Please enter a valid website URL.');
+        return;
+      }
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      if (!name) {
+        try { name = new URL(url).hostname; } catch (e) { name = 'Web App'; }
+      }
+
+      const newApp = {
+        id: 'app_' + Date.now(),
+        name,
+        type: 'web',
+        path: null,
+        url,
+        icon: null,
+        category: catInp.value
+      };
+
+      appState.customApps.push(newApp);
+      persistStorage();
+      renderCustomApps();
+      nameInp.value = '';
+      urlInp.value = '';
+      closeModal();
+
+      window.launchCustomSplitPair(newApp, companion, 50);
+    });
+  }
 }
 
 // Kanban Helper Functions
@@ -2004,14 +2281,79 @@ function setupSketchpad() {
 }
 
 // ==========================================================================
-// AI ASSISTANT CONVERSATION & AUTOMATION
+// DUAL-APP SPLIT LAUNCHER WITH WIN32 SNAP (Feature 1 & Feature 2)
+// ==========================================================================
+window.launchCustomSplitPair = async function(appA, appB, ratio = 50) {
+  resolvePaneFromChoice('left', appA);
+  resolvePaneFromChoice('right', appB);
+
+  setSplitRatio(ratio);
+
+  const titleA = appState.panes.left.title || 'App A';
+  const titleB = appState.panes.right.title || 'App B';
+  const pairTitleEl = document.getElementById('current-pair-title');
+  if (pairTitleEl) pairTitleEl.innerText = `${titleA} + ${titleB}`;
+
+  // Check if either is a native desktop app requiring Win32 hardware window snap
+  const isLeftNative = appState.panes.left.type === 'local-app' && appState.panes.left.path;
+  const isRightNative = appState.panes.right.type === 'local-app' && appState.panes.right.path;
+
+  if (window.api?.localApps?.snapNativeAppHalfWindow) {
+    if (isLeftNative && !isRightNative) {
+      window.api.localApps.snapNativeAppHalfWindow({
+        appPath: appState.panes.left.path,
+        side: 'left',
+        ratio: ratio
+      });
+    } else if (isRightNative && !isLeftNative) {
+      window.api.localApps.snapNativeAppHalfWindow({
+        appPath: appState.panes.right.path,
+        side: 'right',
+        ratio: 100 - ratio
+      });
+    }
+  }
+
+  switchView('split');
+  logSession(titleA, titleB, ratio);
+  showToast(`Launched ${titleA} + ${titleB} (${ratio}/${100 - ratio})`);
+};
+
+// ==========================================================================
+// AI ASSISTANT CONVERSATION & AUTOMATION (Feature 1)
 // ==========================================================================
 function setupAssistant() {
   const sendBtn = document.getElementById('assistant-send-btn');
   const input = document.getElementById('assistant-input');
   const messagesContainer = document.getElementById('assistant-messages');
 
-  const executeCommand = (text) => {
+  let agentInstance = null;
+  try {
+    const AgentClass = typeof AIAgent !== 'undefined' ? AIAgent : (window.AIAgent || null);
+    if (AgentClass) {
+      agentInstance = new AgentClass({
+        workspace: {
+          launchSplitPair: async (appA, appB, ratio) => {
+            await window.launchCustomSplitPair(appA, appB, ratio);
+          },
+          openApp: (app) => {
+            if (app.path || app.isNative) {
+              window.launchCustomSplitPair(app, 'notes', 50);
+            } else {
+              launchSingleApp(app.id || app.name.toLowerCase());
+            }
+          },
+          openUrl: (url, name) => {
+            handleUniversalLaunch(url);
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('AIAgent initialization warning:', err);
+  }
+
+  const executeCommand = async (text) => {
     const q = text.trim();
     if (!q) return;
 
@@ -2021,8 +2363,31 @@ function setupAssistant() {
     userMsg.innerHTML = `<p>${escapeHtml(q)}</p>`;
     messagesContainer.appendChild(userMsg);
     input.value = '';
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    // Process with Smart Workspace Rules
+    // Execute through AIAgent if available
+    if (agentInstance) {
+      try {
+        const result = await agentInstance.processCommand(q);
+        const botMsg = document.createElement('div');
+        botMsg.className = 'assistant-bubble bot';
+        
+        // Format markdown bold
+        const formatted = escapeHtml(result.content).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        botMsg.innerHTML = `
+          <div class="bubble-header"><i data-lucide="bot"></i> <strong>Assistant Jarvis</strong></div>
+          <p>${formatted}</p>
+        `;
+        messagesContainer.appendChild(botMsg);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (window.lucide) window.lucide.createIcons();
+        return;
+      } catch (err) {
+        console.warn('AIAgent processing error:', err);
+      }
+    }
+
+    // Offline rule-based fallback
     setTimeout(() => {
       const lower = q.toLowerCase();
       let responseText = '';
@@ -2056,12 +2421,12 @@ function setupAssistant() {
       botMsg.className = 'assistant-bubble bot';
       botMsg.innerHTML = `
         <div class="bubble-header"><i data-lucide="bot"></i> <strong>Assistant Jarvis</strong></div>
-        <p>${responseText}</p>
+        <p>${responseText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>
       `;
       messagesContainer.appendChild(botMsg);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
       if (window.lucide) window.lucide.createIcons();
-    }, 300);
+    }, 250);
   };
 
   sendBtn.addEventListener('click', () => executeCommand(input.value));
@@ -2078,6 +2443,716 @@ function setupAssistant() {
       const q = chip.getAttribute('data-query');
       executeCommand(q);
     });
+  });
+}
+
+// ==========================================================================
+// USAGE HISTORY & SCREEN TIME ANALYTICS (Feature 3)
+// ==========================================================================
+let usageTickerInterval = null;
+
+function initUsageAnalytics() {
+  if (window.api?.usage?.getAnalytics) {
+    window.api.usage.getAnalytics().then(res => {
+      if (res && res.success && res.data) {
+        if (res.data.cumulativeSeconds) {
+          appState.usage.cumulativeSeconds = Object.assign({}, appState.usage.cumulativeSeconds, res.data.cumulativeSeconds);
+        }
+        if (res.data.pairSeconds) {
+          appState.usage.pairSeconds = Object.assign({}, appState.usage.pairSeconds, res.data.pairSeconds);
+        }
+        if (Array.isArray(res.data.sessions) && res.data.sessions.length > 0) {
+          appState.usage.sessions = res.data.sessions;
+        }
+        updateHubScreenTimeStrip();
+      }
+    }).catch(e => console.warn('Usage analytics get error:', e));
+  }
+
+  try {
+    const saved = localStorage.getItem('app_pair_usage_v2');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.cumulativeSeconds) {
+        appState.usage.cumulativeSeconds = Object.assign({}, parsed.cumulativeSeconds, appState.usage.cumulativeSeconds);
+      }
+      if (parsed.pairSeconds) {
+        appState.usage.pairSeconds = Object.assign({}, parsed.pairSeconds, appState.usage.pairSeconds);
+      }
+      if (Array.isArray(parsed.sessions) && appState.usage.sessions.length === 0) {
+        appState.usage.sessions = parsed.sessions;
+      }
+    }
+  } catch (e) {}
+
+  if (!usageTickerInterval) {
+    usageTickerInterval = setInterval(recordUsageTick, 1000);
+  }
+
+  setInterval(persistUsageAnalytics, 12000);
+
+  const resetBtn = document.getElementById('usage-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('Reset all app usage telemetry and screen time data?')) {
+        appState.usage.todaySeconds = 0;
+        appState.usage.cumulativeSeconds = {};
+        appState.usage.pairSeconds = {};
+        appState.usage.sessions = [];
+        persistUsageAnalytics();
+        renderUsageAnalytics();
+        updateHubScreenTimeStrip();
+        showToast('Telemetry reset');
+      }
+    });
+  }
+
+  updateHubScreenTimeStrip();
+}
+
+function recordUsageTick() {
+  if (document.hidden) return; // Only count when active
+
+  appState.usage.todaySeconds++;
+
+  if (appState.currentView === 'split') {
+    const leftTitle = appState.panes.left.title || appState.panes.left.type || 'Left Pane';
+    const rightTitle = appState.panes.right.title || appState.panes.right.type || 'Right Pane';
+
+    appState.usage.cumulativeSeconds[leftTitle] = (appState.usage.cumulativeSeconds[leftTitle] || 0) + 1;
+    appState.usage.cumulativeSeconds[rightTitle] = (appState.usage.cumulativeSeconds[rightTitle] || 0) + 1;
+
+    const pairKey = `${leftTitle} + ${rightTitle}`;
+    appState.usage.pairSeconds[pairKey] = (appState.usage.pairSeconds[pairKey] || 0) + 1;
+  } else if (appState.currentView === 'word-doc') {
+    appState.usage.cumulativeSeconds['Word Document Studio'] = (appState.usage.cumulativeSeconds['Word Document Studio'] || 0) + 1;
+  } else if (appState.currentView === 'hub') {
+    appState.usage.cumulativeSeconds['Workspace Hub'] = (appState.usage.cumulativeSeconds['Workspace Hub'] || 0) + 1;
+  }
+
+  if (appState.currentView === 'usage') {
+    const totalEl = document.getElementById('metric-total-time');
+    if (totalEl) totalEl.innerText = formatHoursMinutes(appState.usage.todaySeconds);
+  }
+}
+
+function persistUsageAnalytics() {
+  try {
+    const payload = {
+      todaySeconds: appState.usage.todaySeconds,
+      cumulativeSeconds: appState.usage.cumulativeSeconds,
+      pairSeconds: appState.usage.pairSeconds,
+      sessions: appState.usage.sessions.slice(-80)
+    };
+    localStorage.setItem('app_pair_usage_v2', JSON.stringify(payload));
+    if (window.api?.usage?.saveAnalytics) {
+      window.api.usage.saveAnalytics(payload);
+    }
+  } catch (e) {}
+}
+
+function logSession(appA, appB, ratio = 50) {
+  const newSession = {
+    id: 'sess_' + Date.now(),
+    appA: typeof appA === 'object' ? appA.name : appA,
+    appB: typeof appB === 'object' ? appB.name : appB,
+    rawA: appA,
+    rawB: appB,
+    ratio: ratio,
+    timestamp: Date.now(),
+    dateStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
+  };
+
+  appState.usage.sessions.unshift(newSession);
+  if (appState.usage.sessions.length > 80) appState.usage.sessions.pop();
+  persistUsageAnalytics();
+}
+
+function formatHoursMinutes(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h}h ${m.toString().padStart(2, '0')}m`;
+}
+
+function updateHubScreenTimeStrip() {
+  const totalTimeEl = document.getElementById('hub-total-time-val');
+  const topAppEl = document.getElementById('hub-top-app-val');
+  const todaySessionsEl = document.getElementById('hub-today-sessions-val');
+
+  if (totalTimeEl) totalTimeEl.innerText = formatHoursMinutes(appState.usage.todaySeconds);
+
+  let topApp = 'None';
+  let maxSec = 0;
+  for (const [app, sec] of Object.entries(appState.usage.cumulativeSeconds)) {
+    if (sec > maxSec) {
+      maxSec = sec;
+      topApp = app;
+    }
+  }
+  if (topAppEl) topAppEl.innerText = topApp;
+  if (todaySessionsEl) todaySessionsEl.innerText = `${appState.usage.sessions.length} sessions`;
+}
+
+function renderUsageAnalytics() {
+  const totalTimeEl = document.getElementById('metric-total-time');
+  const topAppEl = document.getElementById('metric-top-app');
+  const topAppTimeEl = document.getElementById('metric-top-app-time');
+  const totalSessionsEl = document.getElementById('metric-total-sessions');
+  const topPairEl = document.getElementById('metric-top-pair');
+  const topPairTimeEl = document.getElementById('metric-top-pair-time');
+  const appBarsContainer = document.getElementById('usage-app-bars');
+  const sessionTbody = document.getElementById('session-history-tbody');
+  const sessionCountBadge = document.getElementById('usage-session-count-badge');
+
+  if (totalTimeEl) totalTimeEl.innerText = formatHoursMinutes(appState.usage.todaySeconds);
+  if (totalSessionsEl) totalSessionsEl.innerText = appState.usage.sessions.length.toString();
+  if (sessionCountBadge) sessionCountBadge.innerText = `${appState.usage.sessions.length} SESSIONS`;
+
+  // Top App
+  const sortedApps = Object.entries(appState.usage.cumulativeSeconds).sort((a, b) => b[1] - a[1]);
+  if (sortedApps.length > 0) {
+    if (topAppEl) topAppEl.innerText = sortedApps[0][0];
+    if (topAppTimeEl) topAppTimeEl.innerText = `${formatHoursMinutes(sortedApps[0][1])} active`;
+  } else {
+    if (topAppEl) topAppEl.innerText = 'None';
+    if (topAppTimeEl) topAppTimeEl.innerText = '0h 00m active';
+  }
+
+  // Top Pair
+  const sortedPairs = Object.entries(appState.usage.pairSeconds).sort((a, b) => b[1] - a[1]);
+  if (sortedPairs.length > 0) {
+    if (topPairEl) topPairEl.innerText = sortedPairs[0][0];
+    if (topPairTimeEl) topPairTimeEl.innerText = `${formatHoursMinutes(sortedPairs[0][1])} paired`;
+  } else {
+    if (topPairEl) topPairEl.innerText = 'None';
+    if (topPairTimeEl) topPairTimeEl.innerText = '0h 00m paired';
+  }
+
+  // Horizontal Ranked Progress Bars
+  if (appBarsContainer) {
+    appBarsContainer.innerHTML = '';
+    if (sortedApps.length === 0) {
+      appBarsContainer.innerHTML = '<div style="padding:16px;color:var(--ink-muted);font-size:12px;">No app telemetry recorded yet. Start working in Split View or Hub to record hours.</div>';
+    } else {
+      const highestSec = sortedApps[0][1] || 1;
+      sortedApps.slice(0, 8).forEach(([appName, seconds]) => {
+        const pct = Math.min(100, Math.round((seconds / highestSec) * 100));
+        const barItem = document.createElement('div');
+        barItem.className = 'app-time-bar-item';
+        barItem.innerHTML = `
+          <div class="app-bar-info">
+            <span class="app-bar-name">${escapeHtml(appName)}</span>
+            <span class="app-bar-time">${formatHoursMinutes(seconds)}</span>
+          </div>
+          <div class="app-bar-track">
+            <div class="app-bar-fill" style="width: ${pct}%"></div>
+          </div>
+        `;
+        appBarsContainer.appendChild(barItem);
+      });
+    }
+  }
+
+  // Chronological Session History Log Table
+  if (sessionTbody) {
+    sessionTbody.innerHTML = '';
+    if (appState.usage.sessions.length === 0) {
+      sessionTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--ink-muted);">No sessions logged yet. Launch pairs from the Hub or AI Assistant.</td></tr>`;
+    } else {
+      appState.usage.sessions.slice(0, 25).forEach(sess => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(sess.appA)}</strong></td>
+          <td><span class="session-paired-pill">${escapeHtml(sess.appB)}</span> (${sess.ratio}/${100 - sess.ratio})</td>
+          <td>${sess.dateStr}</td>
+          <td><span class="session-active-tag">Recorded</span></td>
+          <td style="text-align: right;">
+            <button class="tactile-btn small primary re-open-session-btn" data-sess-id="${sess.id}">
+              <i data-lucide="play"></i> Re-open Session
+            </button>
+          </td>
+        `;
+
+        tr.querySelector('.re-open-session-btn').addEventListener('click', () => {
+          window.launchCustomSplitPair(sess.rawA || sess.appA, sess.rawB || sess.appB, sess.ratio || 50);
+        });
+
+        sessionTbody.appendChild(tr);
+      });
+    }
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+// ==========================================================================
+// COMMON PALETTE AUTO-PASTE BRIDGE (Feature 4)
+// ==========================================================================
+function setupPaletteBridge() {
+  const pasteSplitBtn = document.getElementById('palette-paste-split-btn');
+  const pasteNotepadBtn = document.getElementById('palette-paste-notepad-btn');
+  const pasteWordBtn = document.getElementById('palette-paste-word-btn');
+  const autoSyncToggle = document.getElementById('palette-auto-sync-toggle');
+  const syncTargetSelect = document.getElementById('palette-sync-target-select');
+  const snippetInput = document.getElementById('drawer-snippet-input');
+
+  const getActivePaletteText = () => {
+    return (snippetInput ? snippetInput.value : '') || (appState.snippets[0] || '');
+  };
+
+  if (pasteSplitBtn) {
+    pasteSplitBtn.addEventListener('click', () => {
+      const text = getActivePaletteText();
+      if (!text) {
+        showToast('Type text into Palette or select a snippet first');
+        return;
+      }
+      pasteIntoActiveSplitPane(text);
+    });
+  }
+
+  if (pasteNotepadBtn) {
+    pasteNotepadBtn.addEventListener('click', async () => {
+      const text = getActivePaletteText();
+      if (!text) {
+        showToast('Palette input is empty');
+        return;
+      }
+      if (window.api?.external?.pasteToExternalApp) {
+        const res = await window.api.external.pasteToExternalApp({ app: 'notepad', text });
+        if (res && res.success) {
+          showToast('Pasted & Launched in Windows Notepad (.exe)');
+        } else {
+          showToast(`Notepad: ${res?.error || 'Launched'}`);
+        }
+      } else {
+        navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard');
+      }
+    });
+  }
+
+  if (pasteWordBtn) {
+    pasteWordBtn.addEventListener('click', async () => {
+      const text = getActivePaletteText();
+      if (!text) {
+        showToast('Palette input is empty');
+        return;
+      }
+
+      const wordCanvas = document.getElementById('word-editable-canvas');
+      if (wordCanvas) {
+        const p = document.createElement('p');
+        p.innerText = text;
+        wordCanvas.appendChild(p);
+      }
+
+      if (window.api?.external?.pasteToExternalApp) {
+        const res = await window.api.external.pasteToExternalApp({ app: 'word', text });
+        if (res && res.success) {
+          showToast('Inserted into Word Workspace & System Clipboard');
+        } else {
+          showToast('Inserted into Word Studio');
+        }
+      } else {
+        showToast('Inserted into in-app Word Studio');
+      }
+    });
+  }
+
+  if (autoSyncToggle) {
+    autoSyncToggle.checked = appState.paletteAutoSync;
+    autoSyncToggle.addEventListener('change', () => {
+      appState.paletteAutoSync = autoSyncToggle.checked;
+      persistStorage();
+      showToast(`Palette Auto-Sync: ${appState.paletteAutoSync ? 'ENABLED' : 'DISABLED'}`);
+    });
+  }
+
+  if (syncTargetSelect) {
+    syncTargetSelect.value = appState.paletteSyncTarget || 'notes';
+    syncTargetSelect.addEventListener('change', () => {
+      appState.paletteSyncTarget = syncTargetSelect.value;
+      persistStorage();
+    });
+  }
+
+  let autoSyncDebounce = null;
+  if (snippetInput) {
+    snippetInput.addEventListener('input', () => {
+      if (!appState.paletteAutoSync) return;
+      clearTimeout(autoSyncDebounce);
+      autoSyncDebounce = setTimeout(() => {
+        const text = snippetInput.value;
+        if (!text) return;
+        const target = appState.paletteSyncTarget;
+        if (target === 'notes') {
+          pasteIntoNotesPane(text);
+        } else if (target === 'word') {
+          const wordCanvas = document.getElementById('word-editable-canvas');
+          if (wordCanvas) {
+            wordCanvas.innerHTML += `<p>${escapeHtml(text)}</p>`;
+          }
+        } else if (target === 'notepad') {
+          if (window.api?.external?.pasteToExternalApp) {
+            window.api.external.pasteToExternalApp({ app: 'notepad', text });
+          }
+        }
+      }, 500);
+    });
+  }
+}
+
+function pasteIntoActiveSplitPane(text) {
+  if (appState.panes.right.type === 'notes') {
+    pasteIntoNotesPane(text, 'right');
+  } else if (appState.panes.left.type === 'notes') {
+    pasteIntoNotesPane(text, 'left');
+  } else if (appState.panes.right.type === 'word' || appState.panes.left.type === 'word') {
+    const inlineCanvas = document.querySelector('.word-inline-sheet');
+    if (inlineCanvas) {
+      inlineCanvas.innerHTML += `<p>${escapeHtml(text)}</p>`;
+      showToast('Pasted into Split Word Document Pane');
+    }
+  } else {
+    navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard for Split View');
+  }
+}
+
+function pasteIntoNotesPane(text, side = 'right') {
+  const container = side === 'left' ? leftContentView : rightContentView;
+  const textarea = container ? container.querySelector('.notes-textarea') : null;
+  if (textarea) {
+    textarea.value = (textarea.value ? textarea.value + '\n\n' : '') + text;
+    textarea.dispatchEvent(new Event('input'));
+    showToast(`Pasted to ${side.toUpperCase()} Notes Pane`);
+  } else {
+    appState.notes.body = (appState.notes.body ? appState.notes.body + '\n\n' : '') + text;
+    persistStorage();
+    showToast('Appended to Idea Notes');
+  }
+}
+
+// ==========================================================================
+// IN-APP WORD DOCUMENT STUDIO (Feature 6)
+// ==========================================================================
+let wordAutosaveTimer = null;
+
+function setupWordStudio() {
+  const titleInput = document.getElementById('word-doc-title-input');
+  const editableCanvas = document.getElementById('word-editable-canvas');
+  const autosaveBadge = document.getElementById('word-autosave-badge');
+  const metricsPill = document.getElementById('word-metrics-pill');
+  const openLaptopBtn = document.getElementById('word-open-laptop-btn');
+  const saveWorkspaceBtn = document.getElementById('word-save-workspace-btn');
+  const exportDocxBtn = document.getElementById('word-export-docx-btn');
+
+  // Formatting Ribbon Controls
+  const headingSelect = document.getElementById('word-heading-select');
+  if (headingSelect) {
+    headingSelect.addEventListener('change', () => {
+      const val = headingSelect.value;
+      if (val === 'p') {
+        document.execCommand('formatBlock', false, '<p>');
+      } else if (val === 'blockquote') {
+        document.execCommand('formatBlock', false, '<blockquote>');
+      } else {
+        document.execCommand('formatBlock', false, `<${val}>`);
+      }
+      if (editableCanvas) editableCanvas.focus();
+    });
+  }
+
+  const fontSelect = document.getElementById('word-font-select');
+  if (fontSelect) {
+    fontSelect.addEventListener('change', () => {
+      document.execCommand('fontName', false, fontSelect.value);
+      if (editableCanvas) editableCanvas.focus();
+    });
+  }
+
+  const bindCmd = (id, cmd, arg = null) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', () => {
+        document.execCommand(cmd, false, arg);
+        if (editableCanvas) editableCanvas.focus();
+        updateWordMetrics();
+      });
+    }
+  };
+
+  bindCmd('word-cmd-bold', 'bold');
+  bindCmd('word-cmd-italic', 'italic');
+  bindCmd('word-cmd-underline', 'underline');
+  bindCmd('word-cmd-strike', 'strikeThrough');
+  bindCmd('word-cmd-ul', 'insertUnorderedList');
+  bindCmd('word-cmd-ol', 'insertOrderedList');
+  bindCmd('word-cmd-align-left', 'justifyLeft');
+  bindCmd('word-cmd-align-center', 'justifyCenter');
+  bindCmd('word-cmd-align-right', 'justifyRight');
+  bindCmd('word-cmd-clear', 'removeFormat');
+
+  // Insert 3x3 Table
+  const tableBtn = document.getElementById('word-cmd-table');
+  if (tableBtn) {
+    tableBtn.addEventListener('click', () => {
+      const tableHtml = `
+        <table style="width:100%; border-collapse: collapse; margin: 12px 0;">
+          <tbody>
+            <tr>
+              <th style="border: 1.5px solid #141413; padding: 6px 10px; background: #FAF8F5;">Header 1</th>
+              <th style="border: 1.5px solid #141413; padding: 6px 10px; background: #FAF8F5;">Header 2</th>
+              <th style="border: 1.5px solid #141413; padding: 6px 10px; background: #FAF8F5;">Header 3</th>
+            </tr>
+            <tr>
+              <td style="border: 1.5px solid #141413; padding: 6px 10px;">Item 1</td>
+              <td style="border: 1.5px solid #141413; padding: 6px 10px;">Item 2</td>
+              <td style="border: 1.5px solid #141413; padding: 6px 10px;">Item 3</td>
+            </tr>
+            <tr>
+              <td style="border: 1.5px solid #141413; padding: 6px 10px;">Data A</td>
+              <td style="border: 1.5px solid #141413; padding: 6px 10px;">Data B</td>
+              <td style="border: 1.5px solid #141413; padding: 6px 10px;">Data C</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      document.execCommand('insertHTML', false, tableHtml);
+      if (editableCanvas) editableCanvas.focus();
+      updateWordMetrics();
+    });
+  }
+
+  // Update metrics & trigger autosave
+  const updateWordMetrics = () => {
+    if (!editableCanvas) return;
+    const text = editableCanvas.innerText || '';
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const chars = text.length;
+    if (metricsPill) metricsPill.innerText = `${words} words • ${chars} chars`;
+
+    appState.wordDoc.title = titleInput ? titleInput.value : 'Specification Notes.docx';
+    appState.wordDoc.html = editableCanvas.innerHTML;
+    appState.wordDoc.plainText = text;
+    appState.wordDoc.wordCount = words;
+    appState.wordDoc.charCount = chars;
+    appState.wordDoc.lastEdited = Date.now();
+
+    if (autosaveBadge) autosaveBadge.innerHTML = '<i data-lucide="loader"></i> Saving changes...';
+    if (window.lucide) window.lucide.createIcons();
+
+    clearTimeout(wordAutosaveTimer);
+    wordAutosaveTimer = setTimeout(triggerWordAutosave, 3000);
+  };
+
+  if (editableCanvas) {
+    editableCanvas.addEventListener('input', updateWordMetrics);
+  }
+  if (titleInput) {
+    titleInput.addEventListener('input', updateWordMetrics);
+  }
+
+  // Open Real .docx from Laptop
+  if (openLaptopBtn) {
+    openLaptopBtn.addEventListener('click', async () => {
+      if (window.api?.word?.pickFile) {
+        const res = await window.api.word.pickFile();
+        if (res && res.success) {
+          if (titleInput) titleInput.value = res.fileName;
+          if (editableCanvas) editableCanvas.innerHTML = res.html;
+          appState.wordDoc.filePath = res.filePath;
+          appState.wordDoc.title = res.fileName;
+          updateWordMetrics();
+          showToast(`Loaded ${res.fileName} from laptop`);
+        } else if (res && !res.canceled) {
+          showToast(`Error opening docx: ${res.error || 'Failed'}`);
+        }
+      }
+    });
+  }
+
+  // Save to Workspace
+  if (saveWorkspaceBtn) {
+    saveWorkspaceBtn.addEventListener('click', async () => {
+      await triggerWordAutosave();
+      showToast('Document saved in Workspace Storage!');
+    });
+  }
+
+  // Export to .docx
+  if (exportDocxBtn) {
+    exportDocxBtn.addEventListener('click', async () => {
+      if (window.api?.word?.exportDocx) {
+        showToast('Exporting to .docx format...');
+        const res = await window.api.word.exportDocx({
+          title: appState.wordDoc.title || 'Specification Notes.docx',
+          html: editableCanvas ? editableCanvas.innerHTML : '',
+          plainText: editableCanvas ? editableCanvas.innerText : ''
+        });
+        if (res && res.success) {
+          showToast(`Exported to ${res.filePath}`);
+        } else if (res && !res.canceled) {
+          showToast(`Export error: ${res.error || 'Failed'}`);
+        }
+      }
+    });
+  }
+
+  loadSavedWordDocs();
+  updateWordMetrics();
+}
+
+async function triggerWordAutosave() {
+  const autosaveBadge = document.getElementById('word-autosave-badge');
+  const doc = {
+    id: appState.wordDoc.id || 'doc_' + Date.now(),
+    title: appState.wordDoc.title || 'Specification Notes.docx',
+    html: appState.wordDoc.html,
+    plainText: appState.wordDoc.plainText,
+    wordCount: appState.wordDoc.wordCount,
+    charCount: appState.wordDoc.charCount,
+    lastEdited: Date.now()
+  };
+
+  try {
+    localStorage.setItem('app_pair_word_current', JSON.stringify(doc));
+    if (window.api?.word?.saveDocWorkspace) {
+      await window.api.word.saveDocWorkspace(doc);
+    }
+
+    const existingIdx = appState.savedWordDocs.findIndex(d => d.id === doc.id || d.title === doc.title);
+    if (existingIdx >= 0) {
+      appState.savedWordDocs[existingIdx] = doc;
+    } else {
+      appState.savedWordDocs.unshift(doc);
+    }
+    renderWordSavedDocsShelf();
+
+    if (autosaveBadge) {
+      autosaveBadge.innerHTML = '<i data-lucide="check-circle"></i> Auto-saved in Workspace';
+      if (window.lucide) window.lucide.createIcons();
+    }
+  } catch (e) {
+    console.warn('Word autosave error:', e);
+  }
+}
+
+async function loadSavedWordDocs() {
+  if (window.api?.word?.getSavedDocs) {
+    const res = await window.api.word.getSavedDocs();
+    if (res && res.success && Array.isArray(res.docs) && res.docs.length > 0) {
+      appState.savedWordDocs = res.docs;
+    }
+  }
+  if (appState.savedWordDocs.length === 0) {
+    try {
+      const saved = localStorage.getItem('app_pair_word_shelf');
+      if (saved) appState.savedWordDocs = JSON.parse(saved);
+    } catch (e) {}
+  }
+  renderWordSavedDocsShelf();
+}
+
+function renderWordSavedDocsShelf() {
+  const shelfContainer = document.getElementById('hub-word-saved-shelf');
+  if (!shelfContainer) return;
+
+  shelfContainer.innerHTML = '';
+  if (appState.savedWordDocs.length === 0) {
+    shelfContainer.innerHTML = '<div style="padding:12px;color:var(--ink-muted);font-size:12px;">No saved documents yet. Start typing in Word Studio to autosave your work.</div>';
+    return;
+  }
+
+  appState.savedWordDocs.slice(0, 6).forEach(doc => {
+    const card = document.createElement('div');
+    card.className = 'word-doc-shelf-item';
+    const dateStr = doc.lastEdited ? new Date(doc.lastEdited).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently saved';
+
+    card.innerHTML = `
+      <div class="shelf-item-top">
+        <i data-lucide="file-text"></i>
+        <span class="shelf-doc-title" title="${escapeHtml(doc.title)}">${escapeHtml(doc.title)}</span>
+      </div>
+      <div class="shelf-item-snippet">${escapeHtml((doc.plainText || 'No text content...').slice(0, 90))}...</div>
+      <div class="shelf-item-bottom">
+        <span class="shelf-item-meta">${doc.wordCount || 0} words &bull; ${dateStr}</span>
+        <button class="tactile-btn small primary resume-doc-btn">Continue Working &rarr;</button>
+      </div>
+    `;
+
+    card.querySelector('.resume-doc-btn').addEventListener('click', () => {
+      appState.wordDoc = { ...doc };
+      const titleInput = document.getElementById('word-doc-title-input');
+      const editableCanvas = document.getElementById('word-editable-canvas');
+      if (titleInput) titleInput.value = doc.title;
+      if (editableCanvas) editableCanvas.innerHTML = doc.html || `<p>${escapeHtml(doc.plainText || '')}</p>`;
+      switchView('word-doc');
+      showToast(`Resumed "${doc.title}"`);
+    });
+
+    shelfContainer.appendChild(card);
+  });
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function renderWordEditorComponent(side, container) {
+  const editorEl = document.createElement('div');
+  editorEl.className = 'word-editor-inline-container';
+  editorEl.innerHTML = `
+    <div class="word-inline-toolbar">
+      <span class="word-inline-badge"><i data-lucide="file-edit"></i> Word Studio (.docx)</span>
+      <div class="word-inline-actions">
+        <button class="notes-tool-btn" data-cmd="bold"><strong>B</strong></button>
+        <button class="notes-tool-btn" data-cmd="italic"><em>I</em></button>
+        <button class="notes-tool-btn" data-cmd="underline"><u>U</u></button>
+        <button class="notes-tool-btn" data-cmd="insertUnorderedList">• List</button>
+        <button class="tactile-btn small secondary" id="${side}-word-full-btn" title="Open in Full Word Studio"><i data-lucide="maximize-2"></i> Full</button>
+      </div>
+    </div>
+    <div class="word-inline-sheet" contenteditable="true" spellcheck="true">
+      ${appState.wordDoc.html || '<h2>Specification Notes</h2><p>Start writing document here...</p>'}
+    </div>
+    <div class="word-inline-footer">
+      <span id="${side}-word-inline-metrics">Autosaved to Workspace</span>
+      <button class="tactile-btn small primary" id="${side}-word-export-inline-btn"><i data-lucide="download"></i> Export</button>
+    </div>
+  `;
+
+  container.appendChild(editorEl);
+  if (window.lucide) window.lucide.createIcons();
+
+  const sheet = editorEl.querySelector('.word-inline-sheet');
+  sheet.addEventListener('input', () => {
+    appState.wordDoc.html = sheet.innerHTML;
+    appState.wordDoc.plainText = sheet.innerText;
+    clearTimeout(wordAutosaveTimer);
+    wordAutosaveTimer = setTimeout(triggerWordAutosave, 3000);
+  });
+
+  editorEl.querySelectorAll('.notes-tool-btn[data-cmd]').forEach(b => {
+    b.addEventListener('click', () => {
+      document.execCommand(b.getAttribute('data-cmd'));
+      sheet.focus();
+    });
+  });
+
+  editorEl.querySelector(`#${side}-word-full-btn`).addEventListener('click', () => {
+    switchView('word-doc');
+  });
+
+  editorEl.querySelector(`#${side}-word-export-inline-btn`).addEventListener('click', async () => {
+    if (window.api?.word?.exportDocx) {
+      showToast('Exporting to .docx format...');
+      const res = await window.api.word.exportDocx({
+        title: appState.wordDoc.title || 'Specification Notes.docx',
+        html: sheet.innerHTML,
+        plainText: sheet.innerText
+      });
+      if (res && res.success) showToast(`Exported to ${res.filePath}`);
+    }
   });
 }
 
